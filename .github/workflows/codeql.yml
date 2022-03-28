@@ -1,0 +1,94 @@
+name: "CodeQL"
+
+on:
+  push:
+    branches:
+    - master
+    - release-1[1-9].[0-9]
+    - codeql-workflow
+  schedule:
+    - cron: '27 17 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-20.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp', 'python']
+        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
+        # Learn more about CodeQL language support at https://git.io/codeql-language-support
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      with:
+        languages: ${{ matrix.language }}
+        # If you wish to specify custom queries, you can do so here or in a config file.
+        # By default, queries listed here will override any specified in a config file.
+        # Prefix the list here with "+" to use these queries and those in the config file.
+        # queries: ./path/to/local/query, your-org/your-repo/queries@main
+
+
+    - name: Install package dependencies
+      run: |
+        sudo apt-get update && \
+        sudo apt-get install -y --no-install-recommends \
+          autotools-dev \
+          build-essential \
+          ca-certificates \
+          curl \
+          debhelper \
+          devscripts \
+          fakeroot \
+          flex \
+          libcurl4-openssl-dev \
+          libdistro-info-perl \
+          libedit-dev \
+          libfile-fcntllock-perl \
+          libicu-dev \
+          libkrb5-dev \
+          liblz4-1 \
+          liblz4-dev \
+          libpam0g-dev \
+          libreadline-dev \
+          libselinux1-dev \
+          libssl-dev \
+          libxslt-dev \
+          libzstd-dev \
+          libzstd1 \
+          lintian \
+          postgresql-server-dev-all \
+          python3-pip \
+          python3-setuptools \
+          wget \
+          zlib1g-dev
+
+    - name: Add pgenv to PATH and set PG_CONFIG env
+      run: |
+        echo "$HOME/.pgenv/bin" >> $GITHUB_PATH
+        echo "$HOME/.pgenv/pgsql/bin" >> $GITHUB_PATH
+        echo "{PG_CONFIG}={$HOME/.pgenv/pgsql/bin/pg_config}" >> $GITHUB_ENV
+    - name: Install latest PG 14 using pgenv
+      run: |
+        git clone https://github.com/theory/pgenv.git ~/.pgenv && \
+        pgenv build latest 14 &&
+        pgenv use latest
+
+    - if: matrix.language == 'cpp'
+      run: |
+        ./configure
+        make -sj8 install-all
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1
