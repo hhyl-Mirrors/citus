@@ -68,6 +68,12 @@
 #define REPLICATION_SLOT_CATALOG_TABLE_NAME "pg_replication_slots"
 #define CURRENT_LOG_POSITION_COMMAND "SELECT pg_current_wal_lsn()"
 
+#if PG_VERSION_NUM >= PG_VERSION_14
+#define BINARY_LOGICAL_REPLICATION ", binary=true"
+#else
+#define BINARY_LOGICAL_REPLICATION ""
+#endif
+
 /* decimal representation of Adler-16 hash value of citus_shard_move_publication */
 #define SHARD_MOVE_ADVISORY_LOCK_FIRST_KEY 44000
 
@@ -1495,10 +1501,11 @@ CreateShardMoveSubscriptions(MultiConnection *connection, char *sourceNodeName,
 
 		appendStringInfo(createSubscriptionCommand,
 						 "CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s "
-						 "WITH (citus_use_authinfo=true, enabled=false)",
+						 "WITH (citus_use_authinfo=true, enabled=false%s)",
 						 quote_identifier(ShardMoveSubscriptionName(ownerId)),
 						 quote_literal_cstr(conninfo->data),
-						 quote_identifier(ShardMovePublicationName(ownerId)));
+						 quote_identifier(ShardMovePublicationName(ownerId)),
+						 EnableBinaryProtocol ? BINARY_LOGICAL_REPLICATION : "");
 
 		ExecuteCriticalRemoteCommand(connection, createSubscriptionCommand->data);
 		pfree(createSubscriptionCommand->data);
