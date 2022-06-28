@@ -1201,8 +1201,22 @@ CitusExplainOneQuery(Query *query, int cursorOptions, IntoClause *into,
 
 	INSTR_TIME_SET_CURRENT(planstart);
 
-	/* plan the query */
-	PlannedStmt *plan = pg_plan_query_compat(query, NULL, cursorOptions, params);
+	bool oldDisablePreconditions = DisablePreconditions;
+	DisablePreconditions = false;
+	PlannedStmt *plan = NULL;
+
+	PG_TRY();
+	{
+		/* plan the query */
+		plan = pg_plan_query_compat(query, NULL, cursorOptions, params);
+	}
+	PG_FINALLY();
+	{
+		/* In case of an exception in planning, we want to set DisablePreconditions its old value */
+		DisablePreconditions = oldDisablePreconditions;
+	}
+	PG_END_TRY();
+
 	INSTR_TIME_SET_CURRENT(planduration);
 	INSTR_TIME_SUBTRACT(planduration, planstart);
 	#if PG_VERSION_NUM >= PG_VERSION_13
