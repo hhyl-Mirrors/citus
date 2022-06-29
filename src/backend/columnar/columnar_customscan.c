@@ -1341,6 +1341,7 @@ AddColumnarScanPath(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte,
 	}
 
 	int numberOfColumnsRead = bms_num_members(rte->selectedCols);
+
 	/* not sure if we want usefulClauses or allClauses */
 	int numberOfClausesPushed = list_length(allClauses);
 
