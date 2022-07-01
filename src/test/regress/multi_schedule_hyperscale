@@ -53,7 +53,7 @@ test: insert_select_connection_leak
 # ----------
 test: subquery_basics subquery_local_tables subquery_executors set_operations set_operation_and_local_tables
 test: subquery_partitioning subquery_complex_target_list subqueries_not_supported
-test: subquery_prepared_statements pg12 cte_inline
+test: subquery_prepared_statements cte_inline
 
 # ----------
 # Miscellaneous tests to check our query planning behavior
