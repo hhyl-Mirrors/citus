@@ -141,12 +141,14 @@ distributed_planner(Query *parse,
 {
 	bool needsDistributedPlanning = false;
 	bool fastPathRouterQuery = false;
+	bool hasPgLocksTable = false;
 	Node *distributionKeyValue = NULL;
 
 	List *rangeTableList = ExtractRangeTableEntryList(parse);
 
 	if (DisablePreconditions && CitusHasBeenLoaded())
 	{
+		hasPgLocksTable = HasPgLocksTable(rangeTableList);
 		HideCitusDependentObjectsFromPgMetaTable((Node *) parse, NULL);
 	}
 
@@ -157,7 +159,7 @@ distributed_planner(Query *parse,
 
 		needsDistributedPlanning = true;
 	}
-	else if (CitusHasBeenLoaded())
+	else if (!hasPgLocksTable && CitusHasBeenLoaded())
 	{
 		bool maybeHasForeignDistributedTable = false;
 		needsDistributedPlanning =
@@ -276,7 +278,7 @@ distributed_planner(Query *parse,
 	 * standard_planner performs some modifications on parse tree. In such cases
 	 * we will simply error out.
 	 */
-	if (!needsDistributedPlanning && NeedsDistributedPlanning(parse))
+	if (!hasPgLocksTable && !needsDistributedPlanning && NeedsDistributedPlanning(parse))
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg("cannot perform distributed planning on this "

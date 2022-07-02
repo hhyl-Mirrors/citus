@@ -22,6 +22,7 @@
 #include "nodes/parsenodes.h"
 #include "nodes/value.h"
 #include "utils/syscache.h"
+#include "distributed/log_utils.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/relcache.h"
@@ -67,6 +68,11 @@ QualifyCreateStatisticsStmt(Node *node)
 void
 QualifyDropStatisticsStmt(Node *node)
 {
+	if (DisablePreconditions)
+	{
+		return;
+	}
+
 	DropStmt *dropStatisticsStmt = castNode(DropStmt, node);
 	Assert(dropStatisticsStmt->removeType == OBJECT_STATISTIC_EXT);
 

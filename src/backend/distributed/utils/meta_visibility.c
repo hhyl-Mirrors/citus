@@ -19,6 +19,7 @@
 #include "catalog/pg_depend.h"
 #include "catalog/pg_enum.h"
 #include "catalog/pg_event_trigger.h"
+#include "catalog/pg_extension.h"
 #include "catalog/pg_language.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_proc.h"
@@ -30,16 +31,21 @@
 #include "catalog/pg_ts_dict.h"
 #include "catalog/pg_ts_template.h"
 #include "catalog/pg_type.h"
+#include "catalog/namespace.h"
 #include "commands/defrem.h"
 #include "commands/extension.h"
 #include "common/hashfn.h"
 #include "distributed/citus_meta_visibility.h"
 #include "distributed/commands.h"
 #include "distributed/metadata_cache.h"
+#include "distributed/metadata_sync.h"
 #include "distributed/listutils.h"
 #include "distributed/log_utils.h"
+#include "distributed/metadata/dependency.h"
+#include "distributed/metadata/distobject.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
+#include "nodes/parsenodes.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
@@ -81,9 +87,11 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 
 	MemoryContext oldContext = MemoryContextSwitchTo(DependentObjectsContext);
 
+	ObjectAddress objectAdress = { metaTableId, objectId, 0 };
+
 	switch (metaTableId)
 	{
-		/* handle meta objects that can be found in pg_depend */
+		/* handle meta objects whose oids are found in pg_depend */
 		case RelationRelationId:
 		case ProcedureRelationId:
 		case AccessMethodRelationId:
@@ -99,46 +107,46 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 		case ConstraintRelationId:
 		case TypeRelationId:
 		{
-			ObjectAddress objectAdress = { metaTableId, objectId, 0 };
 			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
-		/* handle meta objects that cannot be found in pg_depend */
-		case EnumRelationId:
+		/*
+		 * handle meta objects whose oids are not found in pg_depend,
+		 * but their relations', types', or procedures'
+		 */
+		case SequenceRelationId:
+		case StatisticRelationId:
+		case IndexRelationId:
 		{
-			dependsOnCitus = IsCitusDependentEnum(objectId);
+			objectAdress.classId = RelationRelationId;
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
-		case IndexRelationId:
+		case EnumRelationId:
 		{
-			dependsOnCitus = IsCitusDependentIndex(objectId);
+			objectAdress.classId = TypeRelationId;
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
 		case AggregateRelationId:
 		{
-			dependsOnCitus = IsCitusDependentAggregate(objectId);
-			break;
-		}
-
-		case SequenceRelationId:
-		{
-			dependsOnCitus = IsCitusDependentSequence(objectId);
-			break;
-		}
-
-		case StatisticRelationId:
-		{
-			dependsOnCitus = IsCitusDependentStatistic(objectId);
+			objectAdress.classId = ProcedureRelationId;
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
 		case AttributeRelationId:
 		{
-			int16 attNum = PG_GETARG_INT16(2);
-			dependsOnCitus = IsCitusDependentAttribute(objectId, attNum);
+			objectAdress.classId = RelationRelationId;
+
+			Oid typeId = PG_GETARG_OID(2);
+			ObjectAddress typeObjectAdress = { TypeRelationId, typeId, 0 };
+
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL) ||
+							 IsCitusDependentObject(typeObjectAdress, NULL);
 			break;
 		}
 
@@ -156,10 +164,35 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 
 /*
  * IsCitusDependentObject returns true if the given object is dependent on any citus object.
+ * It looks for direct and indirect dependencies of the given object because we have
+ * the objects of some metaclasses (pg_attribute, pg_constraint, pg_index, pg_aggregate,
+ * pg_statistic, pg_sequence) which are not directly stored in 'pg_depend' meta table,
+ * so we use current approach instead of the short one right below (only finds direct deps):
+ *
+ * Oid citusExtensionId = get_extension_oid("citus", false);
+ * ObjectAddress extensionObjectAddress = {ExtensionRelationId, citusExtensionId, 0};
+ * return IsObjectAddressOwnedByExtension(&objectAddress, &extensionObjectAddress);
  */
 bool
 IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects)
 {
+	/* bool foundCitusDep = false; */
+
+	/* Oid citusId = get_extension_oid("citus", false); */
+	/* ObjectAddress citusExtensionObjectAddress = {ExtensionRelationId, citusId, 0}; */
+
+	/* List *deps = GetAllDependenciesForObject(&objectAddress); */
+	/* ObjectAddress *dep = NULL; */
+	/* foreach_ptr(dep, deps) */
+	/* { */
+	/*  if (IsObjectAddressOwnedByExtension(dep, &citusExtensionObjectAddress)) */
+	/*  { */
+	/*      foundCitusDep = true; */
+	/*      break; */
+	/*  } */
+	/* } */
+
+	/* return foundCitusDep; */
 	Oid citusId = get_extension_oid("citus", false);
 
 	if (dependentObjects == NULL)
@@ -233,173 +266,6 @@ IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects)
 
 
 /*
- * IsCitusDependentEnum returns true if given enum is a citus dependent enum.
- */
-bool
-IsCitusDependentEnum(Oid enumId)
-{
-	HeapTuple enumTuple = SearchSysCache1(ENUMOID, ObjectIdGetDatum(
-											  enumId));
-	if (!HeapTupleIsValid(enumTuple))
-	{
-		/* enum does not exist */
-		return false;
-	}
-
-	Form_pg_enum enumForm = (Form_pg_enum) GETSTRUCT(enumTuple);
-	Oid enumTypeId = enumForm->enumtypid;
-	ObjectAddress typeObjectAddress = { TypeRelationId, enumTypeId, 0 };
-
-	ReleaseSysCache(enumTuple);
-
-	return IsCitusDependentObject(typeObjectAddress, NULL);
-}
-
-
-/*
- * IsCitusDependentIndex returns true if given index is a citus dependent index.
- */
-bool
-IsCitusDependentIndex(Oid indexId)
-{
-	HeapTuple indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexId));
-	if (!HeapTupleIsValid(indexTuple))
-	{
-		/* index not found */
-		return false;
-	}
-
-	Form_pg_index indexForm = (Form_pg_index) GETSTRUCT(indexTuple);
-	Oid indexRelationId = indexForm->indrelid;
-	ObjectAddress relationObjectAddress = { RelationRelationId, indexRelationId, 0 };
-
-	ReleaseSysCache(indexTuple);
-
-	return IsCitusDependentObject(relationObjectAddress, NULL);
-}
-
-
-/*
- * IsCitusDependentAggregate returns true if given aggregate is a citus dependent aggregate.
- */
-bool
-IsCitusDependentAggregate(Oid aggregateId)
-{
-	HeapTuple aggregateTuple = SearchSysCache1(AGGFNOID, ObjectIdGetDatum(aggregateId));
-	if (!HeapTupleIsValid(aggregateTuple))
-	{
-		/* aggregate not found */
-		return false;
-	}
-
-	Form_pg_aggregate aggregateForm = (Form_pg_aggregate) GETSTRUCT(aggregateTuple);
-	ObjectAddress aggregateObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggfnoid, 0
-	};
-	ObjectAddress transFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggtransfn, 0
-	};
-	ObjectAddress finalFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggfinalfn, 0
-	};
-	ObjectAddress combineFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggcombinefn, 0
-	};
-	ObjectAddress serialFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggserialfn, 0
-	};
-	ObjectAddress deserialFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggdeserialfn, 0
-	};
-	ObjectAddress mtransFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggmtransfn, 0
-	};
-	ObjectAddress minvtransFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggminvtransfn, 0
-	};
-	ObjectAddress mfinalFuncObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggmfinalfn, 0
-	};
-	ObjectAddress transTypeObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggtranstype, 0
-	};
-	ObjectAddress mtransTypeObjectAddress = {
-		ProcedureRelationId, aggregateForm->aggmtranstype, 0
-	};
-
-	ReleaseSysCache(aggregateTuple);
-
-	return IsCitusDependentObject(aggregateObjectAddress, NULL) || IsCitusDependentObject(
-		transFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(finalFuncObjectAddress, NULL) || IsCitusDependentObject(
-		combineFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(serialFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(deserialFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(mtransFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(minvtransFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(mfinalFuncObjectAddress, NULL) ||
-		   IsCitusDependentObject(transTypeObjectAddress, NULL) ||
-		   IsCitusDependentObject(mtransTypeObjectAddress, NULL);
-}
-
-
-/*
- * IsCitusDependentSequence returns true if given sequence is a citus dependent sequence.
- */
-bool
-IsCitusDependentSequence(Oid sequenceRelationId)
-{
-	ObjectAddress sequenceRelationObjectAddress = {
-		RelationRelationId, sequenceRelationId, 0
-	};
-	return IsCitusDependentObject(sequenceRelationObjectAddress, NULL);
-}
-
-
-/*
- * IsCitusDependentStatistic returns true if given statistic is a citus dependent statistic.
- */
-bool
-IsCitusDependentStatistic(Oid statisticRelationId)
-{
-	ObjectAddress statisticRelationObjectAddress = {
-		RelationRelationId, statisticRelationId, 0
-	};
-	return IsCitusDependentObject(statisticRelationObjectAddress, NULL);
-}
-
-
-/*
- * IsCitusDependentAttribute returns true if given attribute is a citus dependent attribute.
- */
-bool
-IsCitusDependentAttribute(Oid attributeRelationId, short attNum)
-{
-	HeapTuple attributeTuple = SearchSysCache2(ATTNUM,
-											   ObjectIdGetDatum(attributeRelationId),
-											   Int16GetDatum(attNum));
-	if (!HeapTupleIsValid(attributeTuple))
-	{
-		/* attribute does not exist */
-		return false;
-	}
-
-	Form_pg_attribute attributeForm = (Form_pg_attribute) GETSTRUCT(attributeTuple);
-	ObjectAddress attributeRelationObjectAddress = {
-		RelationRelationId, attributeRelationId, 0
-	};
-	ObjectAddress attributeTypeObjectAddress = {
-		TypeRelationId, attributeForm->atttypid, 0
-	};
-
-	ReleaseSysCache(attributeTuple);
-
-	return IsCitusDependentObject(attributeRelationObjectAddress, NULL) ||
-		   IsCitusDependentObject(attributeTypeObjectAddress, NULL);
-}
-
-
-/*
  * HideCitusDependentObjectsFromPgMetaTable adds a NOT is_citus_depended_object(oid, oid, smallint) expr
  * to the security quals of meta class RTEs.
  */
@@ -435,7 +301,7 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 
 				Oid metaTableOid = InvalidOid;
 
-				/* add NOT is_citus_depended_object(oid, oid, smallint) to the security quals of the RTE */
+				/* add NOT is_citus_depended_object(oid, oid, oid) to the security quals of the RTE */
 				switch (rangeTableEntry->relid)
 				{
 					/* pg_class */
@@ -605,8 +471,29 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 
 
 /*
+ * HasPgLocksTable returns true if RTEs contain pg_locks table.
+ */
+bool
+HasPgLocksTable(List *rtes)
+{
+	Oid pgLocksId = get_relname_relid("pg_locks", get_namespace_oid("pg_catalog", false));
+
+	RangeTblEntry *rte = NULL;
+	foreach_ptr(rte, rtes)
+	{
+		if (rte->relid == pgLocksId)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
+/*
  * CreateCitusDependentObjectExpr constructs an expression of the form:
- * NOT pg_catalog.is_citus_depended_object(oid, oid, smallint)
+ * NOT pg_catalog.is_citus_depended_object(oid, oid, oid)
  */
 static Node *
 CreateCitusDependentObjectExpr(int pgMetaTableVarno, int pgMetaTableOid)
@@ -641,8 +528,8 @@ GetFuncArgs(int pgMetaTableVarno, int pgMetaTableOid)
 										 ObjectIdGetDatum(pgMetaTableOid),
 										 false, true);
 
-	/* oid column is always the first one */
-	AttrNumber oidAttNum = 1;
+	AttrNumber oidAttNum = (pgMetaTableOid == IndexRelationId ||
+							pgMetaTableOid == EnumRelationId) ? 2 : 1;
 
 	Var *oidVar = makeVar(pgMetaTableVarno, oidAttNum,
 						  (pgMetaTableOid == AggregateRelationId) ? REGPROCOID : OIDOID,
@@ -650,20 +537,20 @@ GetFuncArgs(int pgMetaTableVarno, int pgMetaTableOid)
 
 	if (pgMetaTableOid == AttributeRelationId)
 	{
-		AttrNumber attnumAttNum = 6;
-		Var *attnumVar = makeVar(pgMetaTableVarno, attnumAttNum, INT2OID, -1, InvalidOid,
-								 0);
+		AttrNumber typOidAttNum = 3;
+		Var *typeOidVar = makeVar(pgMetaTableVarno, typOidAttNum, OIDOID, -1, InvalidOid,
+								  0);
 
 		return list_make3((Node *) metaTableOidConst, (Node *) oidVar,
-						  (Node *) attnumVar);
+						  (Node *) typeOidVar);
 	}
 	else
 	{
-		Const *dummyAttnumConst = makeConst(INT2OID, -1, InvalidOid, sizeof(int16),
-											Int16GetDatum(0),
-											false, true);
+		Const *dummyTypeOidConst = makeConst(OIDOID, -1, InvalidOid, sizeof(Oid),
+											 ObjectIdGetDatum(InvalidOid),
+											 false, true);
 
 		return list_make3((Node *) metaTableOidConst, (Node *) oidVar,
-						  (Node *) dummyAttnumConst);
+						  (Node *) dummyTypeOidConst);
 	}
 }

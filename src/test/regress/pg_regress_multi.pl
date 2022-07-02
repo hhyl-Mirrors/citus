@@ -1029,11 +1029,11 @@ if ($vanillatest)
     $ENV{PGUSER} = $user;
 	$ENV{VANILLATEST} = "1";
 
+    rmdir "./testtablespace";
+    mkdir "./testtablespace";
+
 	if (-f "$vanillaSchedule")
 	{
-	    rmdir "./testtablespace";
-	    mkdir "./testtablespace";
-
 	    my $pgregressdir=catfile(dirname("$pgxsdir"), "regress");
 	    $exitcode = system("$plainRegress", ("--inputdir",  $pgregressdir),
                 ("--schedule",  catfile("$pgregressdir", "parallel_schedule")), @arguments)

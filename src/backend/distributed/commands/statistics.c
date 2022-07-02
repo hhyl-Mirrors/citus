@@ -159,6 +159,11 @@ List *
 PreprocessDropStatisticsStmt(Node *node, const char *queryString,
 							 ProcessUtilityContext processUtilityContext)
 {
+	if (DisablePreconditions)
+	{
+		return NIL;
+	}
+
 	DropStmt *dropStatisticsStmt = castNode(DropStmt, node);
 	Assert(dropStatisticsStmt->removeType == OBJECT_STATISTIC_EXT);
 
