@@ -1,0 +1,16 @@
+SELECT column_name FROM information_schema.columns WHERE table_name = 'citus_locks' AND column_name NOT IN ('waitstart')
+EXCEPT SELECT column_name FROM information_schema.columns WHERE table_name = 'pg_locks'
+ORDER BY 1;
+ column_name
+---------------------------------------------------------------------
+ global_pid
+ nodeid
+(2 rows)
+
+SELECT column_name FROM information_schema.columns WHERE table_name = 'pg_locks'
+EXCEPT SELECT column_name FROM information_schema.columns WHERE table_name = 'citus_locks'
+ORDER BY 1;
+ column_name
+---------------------------------------------------------------------
+(0 rows)
+

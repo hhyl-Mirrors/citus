@@ -46,4 +46,7 @@ CREATE FUNCTION pg_catalog.worker_repartition_cleanup(bigint)
  STRICT
 AS 'MODULE_PATHNAME', $function$worker_repartition_cleanup$function$;
 
+DROP VIEW pg_catalog.citus_locks;
+DROP FUNCTION pg_catalog.citus_locks();
+
 #include "../../../columnar/sql/downgrades/columnar--11.1-1--11.0-3.sql"
