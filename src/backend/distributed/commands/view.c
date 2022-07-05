@@ -107,6 +107,32 @@ PostprocessViewStmt(Node *node, const char *queryString)
 		return NIL;
 	}
 
+	if (DisablePreconditions)
+	{
+		bool hasDistDependency = false;
+		List *dependencies = GetAllDependenciesForObject(&viewAddress);
+		ObjectAddress *dependency = NULL;
+
+		foreach_ptr(dependency, dependencies)
+		{
+			/*
+			 * We normally distribute views like `CREATE VIEW v1 AS SELECT 1`,
+			 * but when DisablePreconditions, we do not.
+			 */
+			if (IsObjectDistributed(dependency))
+			{
+				hasDistDependency = true;
+
+				break;
+			}
+		}
+
+		if (!hasDistDependency)
+		{
+			return NIL;
+		}
+	}
+
 	EnsureDependenciesExistOnAllNodes(&viewAddress);
 
 	char *command = CreateViewDDLCommand(viewAddress.objectId);
