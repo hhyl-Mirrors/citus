@@ -39,7 +39,12 @@ char *
 GetTypeNamespaceNameByNameList(List *names)
 {
 	TypeName *typeName = makeTypeNameFromNameList(names);
-	Oid typeOid = LookupTypeNameOid(NULL, typeName, false);
+	Oid typeOid = LookupTypeNameOid(NULL, typeName, true);
+	if (!OidIsValid(typeOid))
+	{
+		return NULL;
+	}
+
 	Oid namespaceOid = TypeOidGetNamespaceOid(typeOid);
 	char *nspname = get_namespace_name_or_temp(namespaceOid);
 	return nspname;
@@ -123,11 +128,6 @@ QualifyAlterEnumStmt(Node *node)
 void
 QualifyAlterTypeStmt(Node *node)
 {
-	if (DisablePreconditions)
-	{
-		return;
-	}
-
 	AlterTableStmt *stmt = castNode(AlterTableStmt, node);
 	Assert(AlterTableStmtObjType_compat(stmt) == OBJECT_TYPE);
 
@@ -135,7 +135,10 @@ QualifyAlterTypeStmt(Node *node)
 	{
 		List *names = MakeNameListFromRangeVar(stmt->relation);
 		char *nspname = GetTypeNamespaceNameByNameList(names);
-		stmt->relation->schemaname = nspname;
+		if (nspname)
+		{
+			stmt->relation->schemaname = nspname;
+		}
 	}
 }
 

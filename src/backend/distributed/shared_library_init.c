@@ -856,7 +856,7 @@ RegisterCitusConfigVariables(void)
 		&DisablePreconditions,
 		false,
 		PGC_USERSET,
-		GUC_STANDARD,
+		GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
 
 	DefineCustomRealVariable(

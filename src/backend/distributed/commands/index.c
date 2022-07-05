@@ -321,6 +321,11 @@ ExecuteFunctionOnEachTableIndex(Oid relationId, PGIndexProcessor pgIndexProcesso
 	List *result = NIL;
 
 	Relation relation = RelationIdGetRelation(relationId);
+	if (!RelationIsValid(relation))
+	{
+		return NIL;
+	}
+
 	List *indexIdList = RelationGetIndexList(relation);
 	Oid indexId = InvalidOid;
 	foreach_oid(indexId, indexIdList)
@@ -534,11 +539,6 @@ List *
 PreprocessReindexStmt(Node *node, const char *reindexCommand,
 					  ProcessUtilityContext processUtilityContext)
 {
-	if (DisablePreconditions)
-	{
-		return NIL;
-	}
-
 	ReindexStmt *reindexStatement = castNode(ReindexStmt, node);
 	List *ddlJobs = NIL;
 
@@ -566,16 +566,26 @@ PreprocessReindexStmt(Node *node, const char *reindexCommand,
 			state.locked_table_oid = InvalidOid;
 
 			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation,
-												  lockmode, 0,
+												  lockmode, RVR_MISSING_OK,
 												  RangeVarCallbackForReindexIndex,
 												  &state);
+			if (!OidIsValid(indOid))
+			{
+				return NIL;
+			}
+
 			relation = index_open(indOid, NoLock);
 			relationId = IndexGetRelation(indOid, false);
 		}
 		else
 		{
-			RangeVarGetRelidExtended(reindexStatement->relation, lockmode, 0,
-									 RangeVarCallbackOwnsTable, NULL);
+			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation, lockmode,
+												  RVR_MISSING_OK,
+												  RangeVarCallbackOwnsTable, NULL);
+			if (!OidIsValid(indOid))
+			{
+				return NIL;
+			}
 
 			relation = table_openrv(reindexStatement->relation, NoLock);
 			relationId = RelationGetRelid(relation);

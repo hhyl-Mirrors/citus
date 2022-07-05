@@ -1390,7 +1390,10 @@ PostprocessCreateFunctionStmt(Node *node, const char *queryString)
 
 	if (errMsg != NULL)
 	{
-		RaiseDeferredError(errMsg, WARNING);
+		if (!DisablePreconditions)
+		{
+			RaiseDeferredError(errMsg, WARNING);
+		}
 		return NIL;
 	}
 

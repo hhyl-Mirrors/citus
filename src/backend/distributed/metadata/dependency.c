@@ -828,11 +828,6 @@ ErrorOrWarnIfObjectHasUnsupportedDependency(ObjectAddress *objectAddress)
 DeferredErrorMessage *
 DeferErrorIfHasUnsupportedDependency(const ObjectAddress *objectAddress)
 {
-	if (DisablePreconditions)
-	{
-		return NULL;
-	}
-
 	ObjectAddress *undistributableDependency = GetUndistributableDependency(
 		objectAddress);
 

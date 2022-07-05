@@ -27,11 +27,6 @@ static void QualifyViewRangeVar(RangeVar *view);
 void
 QualifyDropViewStmt(Node *node)
 {
-	if (DisablePreconditions)
-	{
-		return;
-	}
-
 	DropStmt *stmt = castNode(DropStmt, node);
 	List *qualifiedViewNames = NIL;
 
@@ -47,7 +42,11 @@ QualifyDropViewStmt(Node *node)
 		{
 			RangeVar *viewRangeVar = makeRangeVarFromNameList(possiblyQualifiedViewName);
 			Oid viewOid = RangeVarGetRelid(viewRangeVar, AccessExclusiveLock,
-										   stmt->missing_ok);
+										   true);
+			if (!stmt->missing_ok && !OidIsValid(viewOid))
+			{
+				return;
+			}
 
 			/*
 			 * If DROP VIEW IF EXISTS called and the view doesn't exist, oid can be invalid.

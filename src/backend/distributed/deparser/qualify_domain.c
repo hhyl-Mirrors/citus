@@ -15,6 +15,7 @@
 
 #include "catalog/namespace.h"
 #include "catalog/pg_collation.h"
+#include "catalog/pg_constraint.h"
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_type.h"
@@ -81,18 +82,18 @@ QualifyDropDomainStmt(Node *node)
 void
 QualifyAlterDomainStmt(Node *node)
 {
-	if (DisablePreconditions)
-	{
-		return;
-	}
-
 	AlterDomainStmt *stmt = castNode(AlterDomainStmt, node);
 
 	if (list_length(stmt->typeName) == 1)
 	{
 		TypeName *typeName = makeTypeNameFromNameList(stmt->typeName);
 		QualifyTypeName(typeName, false);
-		stmt->typeName = typeName->names;
+
+		Oid constraintId = get_domain_constraint_oid(typeName->typeOid, stmt->name, true);
+		if (OidIsValid(constraintId))
+		{
+			stmt->typeName = typeName->names;
+		}
 	}
 }
 

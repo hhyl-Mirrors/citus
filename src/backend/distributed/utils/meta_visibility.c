@@ -176,23 +176,6 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 bool
 IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects)
 {
-	/* bool foundCitusDep = false; */
-
-	/* Oid citusId = get_extension_oid("citus", false); */
-	/* ObjectAddress citusExtensionObjectAddress = {ExtensionRelationId, citusId, 0}; */
-
-	/* List *deps = GetAllDependenciesForObject(&objectAddress); */
-	/* ObjectAddress *dep = NULL; */
-	/* foreach_ptr(dep, deps) */
-	/* { */
-	/*  if (IsObjectAddressOwnedByExtension(dep, &citusExtensionObjectAddress)) */
-	/*  { */
-	/*      foundCitusDep = true; */
-	/*      break; */
-	/*  } */
-	/* } */
-
-	/* return foundCitusDep; */
 	Oid citusId = get_extension_oid("citus", false);
 
 	if (dependentObjects == NULL)
@@ -453,8 +436,10 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 
 				if (OidIsValid(metaTableOid))
 				{
-					rangeTableEntry->securityQuals =
-						list_make1(CreateCitusDependentObjectExpr(varno, metaTableOid));
+					rangeTableEntry->securityQuals = list_concat(
+						rangeTableEntry->securityQuals,
+						list_make1(
+							CreateCitusDependentObjectExpr(varno, metaTableOid)));
 				}
 
 				MemoryContextSwitchTo(originalContext);

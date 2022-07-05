@@ -159,11 +159,6 @@ List *
 PreprocessDropStatisticsStmt(Node *node, const char *queryString,
 							 ProcessUtilityContext processUtilityContext)
 {
-	if (DisablePreconditions)
-	{
-		return NIL;
-	}
-
 	DropStmt *dropStatisticsStmt = castNode(DropStmt, node);
 	Assert(dropStatisticsStmt->removeType == OBJECT_STATISTIC_EXT);
 
@@ -264,11 +259,6 @@ List *
 PreprocessAlterStatisticsSchemaStmt(Node *node, const char *queryString,
 									ProcessUtilityContext processUtilityContext)
 {
-	if (DisablePreconditions)
-	{
-		return NIL;
-	}
-
 	AlterObjectSchemaStmt *stmt = castNode(AlterObjectSchemaStmt, node);
 	Assert(stmt->objectType == OBJECT_STATISTIC_EXT);
 
@@ -554,6 +544,15 @@ GetExplicitStatisticsSchemaIdList(Oid relationId)
 	List *schemaIdList = NIL;
 
 	Relation relation = RelationIdGetRelation(relationId);
+	if (!RelationIsValid(relation))
+	{
+		if (DisablePreconditions)
+		{
+			return NIL;
+		}
+
+		elog(ERROR, "could not open relation with OID %u", relationId);
+	}
 	List *statsIdList = RelationGetStatExtList(relation);
 	RelationClose(relation);
 

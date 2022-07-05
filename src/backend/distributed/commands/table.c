@@ -427,11 +427,6 @@ List *
 PreprocessAlterTableStmtAttachPartition(AlterTableStmt *alterTableStatement,
 										const char *queryString)
 {
-	if (DisablePreconditions)
-	{
-		return NIL;
-	}
-
 	List *commandList = alterTableStatement->cmds;
 	AlterTableCmd *alterTableCommand = NULL;
 	foreach_ptr(alterTableCommand, commandList)
@@ -446,9 +441,12 @@ PreprocessAlterTableStmtAttachPartition(AlterTableStmt *alterTableStatement,
 			Oid parentRelationId = AlterTableLookupRelation(alterTableStatement,
 															lockmode);
 			PartitionCmd *partitionCommand = (PartitionCmd *) alterTableCommand->def;
-			bool partitionMissingOk = false;
 			Oid partitionRelationId = RangeVarGetRelid(partitionCommand->name, lockmode,
-													   partitionMissingOk);
+													   true);
+			if (!OidIsValid(partitionRelationId))
+			{
+				return NIL;
+			}
 
 			if (!IsCitusTable(parentRelationId))
 			{

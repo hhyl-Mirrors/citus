@@ -70,7 +70,10 @@ PostprocessCreateDistributedObjectFromCatalogStmt(Node *stmt, const char *queryS
 	DeferredErrorMessage *depError = DeferErrorIfHasUnsupportedDependency(&address);
 	if (depError != NULL)
 	{
-		RaiseDeferredError(depError, WARNING);
+		if (!DisablePreconditions)
+		{
+			RaiseDeferredError(depError, WARNING);
+		}
 		return NIL;
 	}
 
