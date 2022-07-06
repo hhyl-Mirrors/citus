@@ -262,6 +262,9 @@ extern void EnsureDependenciesExistOnAllNodes(const ObjectAddress *target);
 extern DeferredErrorMessage * DeferErrorIfCircularDependencyExists(const
 																   ObjectAddress *
 																   objectAddress);
+extern DeferredErrorMessage * DeferErrorIfCircularDependencyExistsOnObject(const
+																		   ObjectAddress *
+																		   objectAddress);
 extern List * GetDistributableDependenciesForObject(const ObjectAddress *target);
 extern List * GetDependencyCreateDDLCommands(const ObjectAddress *dependency);
 extern bool ShouldPropagate(void);
