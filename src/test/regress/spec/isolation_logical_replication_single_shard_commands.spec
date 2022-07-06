@@ -5,12 +5,12 @@ setup
   SELECT citus_internal.replace_isolation_tester_func();
   SELECT citus_internal.refresh_isolation_tester_prepared_statement();
 
-	SET citus.shard_count TO 8;
-	SET citus.shard_replication_factor TO 1;
-	CREATE TABLE logical_replicate_placement (x int PRIMARY KEY, y int);
-	SELECT create_distributed_table('logical_replicate_placement', 'x');
+    SET citus.shard_count TO 8;
+    SET citus.shard_replication_factor TO 1;
+    CREATE TABLE logical_replicate_placement (x int PRIMARY KEY, y int);
+    SELECT create_distributed_table('logical_replicate_placement', 'x');
 
-	SELECT get_shard_id_for_distribution_column('logical_replicate_placement', 15) INTO selected_shard;
+    SELECT get_shard_id_for_distribution_column('logical_replicate_placement', 15) INTO selected_shard;
 }
 
 teardown
@@ -18,7 +18,7 @@ teardown
   SELECT citus_internal.restore_isolation_tester_func();
 
   DROP TABLE selected_shard;
-	DROP TABLE logical_replicate_placement;
+    DROP TABLE logical_replicate_placement;
 }
 
 
@@ -26,17 +26,17 @@ session "s1"
 
 step "s1-begin"
 {
-	BEGIN;
+    BEGIN;
 }
 
 step "s1-move-placement"
 {
-    	SELECT master_move_shard_placement((SELECT * FROM selected_shard), 'localhost', 57637, 'localhost', 57638);
+        SELECT master_move_shard_placement((SELECT * FROM selected_shard), 'localhost', 57637, 'localhost', 57638);
 }
 
 step "s1-end"
 {
-	COMMIT;
+    COMMIT;
 }
 
 step "s1-select"
@@ -63,9 +63,9 @@ step "s2-begin"
 
 step "s2-move-placement"
 {
-	SELECT master_move_shard_placement(
-		get_shard_id_for_distribution_column('logical_replicate_placement', 4),
-		'localhost', 57637, 'localhost', 57638);
+    SELECT master_move_shard_placement(
+        get_shard_id_for_distribution_column('logical_replicate_placement', 4),
+        'localhost', 57637, 'localhost', 57638);
 }
 
 step "s2-select"
@@ -102,7 +102,7 @@ step "s2-upsert"
 
 step "s2-end"
 {
-	  COMMIT;
+    COMMIT;
 }
 
 session "s3"
