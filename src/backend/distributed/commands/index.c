@@ -321,11 +321,6 @@ ExecuteFunctionOnEachTableIndex(Oid relationId, PGIndexProcessor pgIndexProcesso
 	List *result = NIL;
 
 	Relation relation = RelationIdGetRelation(relationId);
-	if (!RelationIsValid(relation))
-	{
-		return NIL;
-	}
-
 	List *indexIdList = RelationGetIndexList(relation);
 	Oid indexId = InvalidOid;
 	foreach_oid(indexId, indexIdList)
@@ -333,7 +328,7 @@ ExecuteFunctionOnEachTableIndex(Oid relationId, PGIndexProcessor pgIndexProcesso
 		HeapTuple indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexId));
 		if (!HeapTupleIsValid(indexTuple))
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				ereport(ERROR, (errmsg("cache lookup failed for index with oid %u",
 									   indexId)));

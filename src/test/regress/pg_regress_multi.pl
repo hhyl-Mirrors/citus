@@ -486,10 +486,20 @@ push(@pgOptions, "citus.show_shards_for_app_name_prefixes='pg_regress'");
 # we disable slow start by default to encourage parallelism within tests
 push(@pgOptions, "citus.executor_slow_start_interval=0ms");
 
-# we disable citus precondition checks to not break postgres vanilla test behaviour
+# we set some GUCs to not break postgres vanilla tests
 if($vanillatest)
 {
-    push(@pgOptions, "citus.disable_citus_preconditions=true");
+    # we show shards to not break postgres vanilla test behaviour
+    push(@pgOptions, "citus.override_table_visibility=false");
+
+    # we disable citus propagation warnings to not break postgres vanilla test behaviour
+    push(@pgOptions, "citus.enable_propagation_warnings=false");
+
+    # we enable hiding the citus dependent objects from pg meta class queries to not break postgres vanilla test behaviour
+    push(@pgOptions, "citus.hide_citus_dependent_objects=true");
+
+    # we disable distributing the local views with no distributed dependency to not break postgres vanilla test behaviour
+    push(@pgOptions, "citus.distribute_local_views=false");
 }
 
 if ($useMitmproxy)

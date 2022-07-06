@@ -8,3 +8,4 @@ DROP FUNCTION pg_catalog.worker_range_partition_table(bigint, integer, text, tex
 DROP FUNCTION pg_catalog.worker_repartition_cleanup(bigint);
 
 #include "../../columnar/sql/columnar--11.0-3--11.1-1.sql"
+#include "udfs/citus_meta_filter/11.1-1.sql"

@@ -23,8 +23,8 @@
 #endif
 
 
-/* GUC disables citus related preconditions, it is intended to be used in vanilla tests to not break postgres test logs */
-bool DisablePreconditions = false;
+/* GUC enables citus propagation warnings and errors, it is intended to be used in vanilla tests to not break postgres test logs */
+bool EnablePropagationWarnings = true;
 
 
 /*

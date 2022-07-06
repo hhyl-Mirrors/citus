@@ -35,6 +35,9 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
+/* GUC distributes local views that has no distributed dependency */
+bool DistributeLocalViews = true;
+
 static List * FilterNameListForDistributedViews(List *viewNamesList, bool missing_ok);
 static void AppendQualifiedViewNameToCreateViewCommand(StringInfo buf, Oid viewOid);
 static void AppendViewDefinitionToCreateViewCommand(StringInfo buf, Oid viewOid);
@@ -107,7 +110,7 @@ PostprocessViewStmt(Node *node, const char *queryString)
 		return NIL;
 	}
 
-	if (DisablePreconditions)
+	if (!DistributeLocalViews)
 	{
 		bool hasDistDependency = false;
 		List *dependencies = GetAllDependenciesForObject(&viewAddress);
@@ -117,7 +120,7 @@ PostprocessViewStmt(Node *node, const char *queryString)
 		{
 			/*
 			 * We normally distribute views like `CREATE VIEW v1 AS SELECT 1`,
-			 * but when DisablePreconditions, we do not.
+			 * but when DistributeLocalViews is set false, we do not.
 			 */
 			if (IsObjectDistributed(dependency))
 			{

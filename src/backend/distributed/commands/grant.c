@@ -91,12 +91,9 @@ PreprocessGrantStmt(Node *node, const char *queryString,
 
 			if (priv->cols != NIL)
 			{
-				if (!DisablePreconditions)
-				{
-					ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-									errmsg("grant/revoke on column list is currently "
-										   "unsupported")));
-				}
+				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								errmsg("grant/revoke on column list is currently "
+									   "unsupported")));
 
 				return NIL;
 			}

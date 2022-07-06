@@ -25,6 +25,7 @@
 #include "commands/explain.h"
 #include "commands/tablecmds.h"
 #include "optimizer/cost.h"
+#include "distributed/citus_meta_visibility.h"
 #include "distributed/citus_nodefuncs.h"
 #include "distributed/connection_management.h"
 #include "distributed/deparse_shard_query.h"
@@ -1201,8 +1202,9 @@ CitusExplainOneQuery(Query *query, int cursorOptions, IntoClause *into,
 
 	INSTR_TIME_SET_CURRENT(planstart);
 
-	bool oldDisablePreconditions = DisablePreconditions;
-	DisablePreconditions = false;
+	/* we should not hide any objcets while explain some query to not break postgres vanilla tests */
+	bool oldHideCitusDependentObjects = HideCitusDependentObjects;
+	HideCitusDependentObjects = false;
 	PlannedStmt *plan = NULL;
 
 	PG_TRY();
@@ -1212,8 +1214,8 @@ CitusExplainOneQuery(Query *query, int cursorOptions, IntoClause *into,
 	}
 	PG_FINALLY();
 	{
-		/* In case of an exception in planning, we want to set DisablePreconditions its old value */
-		DisablePreconditions = oldDisablePreconditions;
+		/* In case of an exception in planning, we want to set HideCitusDependentObjects its old value */
+		HideCitusDependentObjects = oldHideCitusDependentObjects;
 	}
 	PG_END_TRY();
 

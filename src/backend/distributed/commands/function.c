@@ -1366,7 +1366,7 @@ PreprocessCreateFunctionStmt(Node *node, const char *queryString,
 List *
 PostprocessCreateFunctionStmt(Node *node, const char *queryString)
 {
-	if (DisablePreconditions)
+	if (!EnablePropagationWarnings)
 	{
 		return NIL;
 	}
@@ -1390,7 +1390,7 @@ PostprocessCreateFunctionStmt(Node *node, const char *queryString)
 
 	if (errMsg != NULL)
 	{
-		if (!DisablePreconditions)
+		if (EnablePropagationWarnings)
 		{
 			RaiseDeferredError(errMsg, WARNING);
 		}

@@ -32,6 +32,7 @@
 #include "common/string.h"
 #include "executor/executor.h"
 #include "distributed/backend_data.h"
+#include "distributed/citus_meta_visibility.h"
 #include "distributed/citus_nodefuncs.h"
 #include "distributed/citus_safe_lib.h"
 #include "distributed/commands.h"
@@ -850,11 +851,11 @@ RegisterCitusConfigVariables(void)
 		NULL, NULL, NULL);
 
 	DefineCustomBoolVariable(
-		"citus.disable_citus_preconditions",
-		gettext_noop("Disables citus related preconditions"),
+		"citus.distribute_local_views",
+		gettext_noop("Enables distribution of local views"),
 		NULL,
-		&DisablePreconditions,
-		false,
+		&DistributeLocalViews,
+		true,
 		PGC_USERSET,
 		GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
@@ -1040,6 +1041,16 @@ RegisterCitusConfigVariables(void)
 		true,
 		PGC_USERSET,
 		GUC_NO_SHOW_ALL,
+		NULL, NULL, NULL);
+
+	DefineCustomBoolVariable(
+		"citus.enable_propagation_warnings",
+		gettext_noop("Enables citus propagation warnings and errors"),
+		NULL,
+		&EnablePropagationWarnings,
+		true,
+		PGC_USERSET,
+		GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
 
 	DefineCustomBoolVariable(
@@ -1243,6 +1254,17 @@ RegisterCitusConfigVariables(void)
 		"",
 		PGC_USERSET,
 		GUC_NO_SHOW_ALL,
+		NULL, NULL, NULL);
+
+	DefineCustomBoolVariable(
+		"citus.hide_citus_dependent_objects",
+		gettext_noop(
+			"Hides any object, which depends on citus extension, from pg meta class queries"),
+		NULL,
+		&HideCitusDependentObjects,
+		false,
+		PGC_USERSET,
+		GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL,
 		NULL, NULL, NULL);
 
 	DefineCustomIntVariable(

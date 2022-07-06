@@ -1753,7 +1753,7 @@ List *
 PreprocessAlterTableMoveAllStmt(Node *node, const char *queryString,
 								ProcessUtilityContext processUtilityContext)
 {
-	if (!DisablePreconditions)
+	if (EnablePropagationWarnings)
 	{
 		ereport(WARNING, (errmsg("not propagating ALTER TABLE ALL IN TABLESPACE "
 								 "commands to worker nodes"),

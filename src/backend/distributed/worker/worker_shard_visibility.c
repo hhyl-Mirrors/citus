@@ -281,7 +281,7 @@ void
 HideShardsFromSomeApplications(Query *query)
 {
 	if (!OverrideTableVisibility || HideShards == DO_NOT_HIDE_SHARDS ||
-		!CitusHasBeenLoaded() || !CheckCitusVersion(DEBUG2) || DisablePreconditions)
+		!CitusHasBeenLoaded() || !CheckCitusVersion(DEBUG2))
 	{
 		return;
 	}

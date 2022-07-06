@@ -706,7 +706,7 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 		if (IsA(parsetree, RenameStmt) && ((RenameStmt *) parsetree)->renameType ==
 			OBJECT_ROLE && EnableAlterRolePropagation)
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				ereport(NOTICE, (errmsg(
 									 "not propagating ALTER ROLE ... RENAME TO commands "

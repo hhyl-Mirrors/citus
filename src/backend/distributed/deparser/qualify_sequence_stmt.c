@@ -127,7 +127,7 @@ QualifyDropSequenceStmt(Node *node)
 
 			if (!stmt->missing_ok && !OidIsValid(seqOid))
 			{
-				if (DisablePreconditions)
+				if (!EnablePropagationWarnings)
 				{
 					return;
 				}

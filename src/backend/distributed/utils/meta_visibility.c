@@ -51,6 +51,9 @@
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
+/* GUC hides any objects, which depends on citus extension, from pg meta class queries, it is intended to be used in vanilla tests to not break postgres test logs */
+bool HideCitusDependentObjects = false;
+
 /* memory context for allocating DependentObjects */
 static MemoryContext DependentObjectsContext = NULL;
 

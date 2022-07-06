@@ -1039,7 +1039,7 @@ pg_get_indexclusterdef_string(Oid indexRelationId)
 										  0, 0, 0);
 	if (!HeapTupleIsValid(indexTuple))
 	{
-		if (!DisablePreconditions)
+		if (EnablePropagationWarnings)
 		{
 			ereport(ERROR, (errmsg("cache lookup failed for index %u", indexRelationId)));
 		}

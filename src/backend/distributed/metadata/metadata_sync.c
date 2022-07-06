@@ -2255,7 +2255,7 @@ GenerateGrantOnFunctionQueriesFromAclItem(Oid functionOid, AclItem *aclItem)
 		}
 		else
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				ereport(ERROR, (errmsg("unsupported prokind"),
 								errdetail(

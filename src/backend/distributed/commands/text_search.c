@@ -710,7 +710,7 @@ AlterTextSearchConfigurationSchemaStmtObjectAddress(Node *node, bool missing_ok)
 
 		if (!missing_ok && !OidIsValid(objid))
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				/*
 				 * if the text search config id is still invalid we couldn't find it, error
@@ -766,7 +766,7 @@ AlterTextSearchDictionarySchemaStmtObjectAddress(Node *node, bool missing_ok)
 
 		if (!missing_ok && !OidIsValid(objid))
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				/*
 				 * if the text search dict id is still invalid we couldn't find it, error

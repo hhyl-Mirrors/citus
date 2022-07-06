@@ -527,7 +527,7 @@ GetIndexCommandListForShardBackingReplicaIdentity(Oid relationId, uint64 shardId
 			SearchSysCache1(INDEXRELID, ObjectIdGetDatum(replicaIdentityIndex));
 		if (!HeapTupleIsValid(indexTuple))
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				/* should not happen */
 				elog(ERROR, "cache lookup failed for index %u", replicaIdentityIndex);

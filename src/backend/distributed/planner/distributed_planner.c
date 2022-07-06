@@ -146,7 +146,7 @@ distributed_planner(Query *parse,
 
 	List *rangeTableList = ExtractRangeTableEntryList(parse);
 
-	if (DisablePreconditions && CitusHasBeenLoaded())
+	if (HideCitusDependentObjects && CitusHasBeenLoaded())
 	{
 		hasPgLocksTable = HasPgLocksTable(rangeTableList);
 		HideCitusDependentObjectsFromPgMetaTable((Node *) parse, NULL);

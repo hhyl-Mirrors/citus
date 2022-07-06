@@ -82,7 +82,7 @@ QualifyDropDomainStmt(Node *node)
 void
 QualifyAlterDomainStmt(Node *node)
 {
-	if (DisablePreconditions)
+	if (!EnablePropagationWarnings)
 	{
 		return;
 	}

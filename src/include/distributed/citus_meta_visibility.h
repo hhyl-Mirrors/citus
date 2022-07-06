@@ -17,6 +17,8 @@
 #include "postgres_ext.h"
 #include "utils/hsearch.h"
 
+extern bool HideCitusDependentObjects;
+
 extern bool HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context);
 extern bool HasPgLocksTable(List *rtes);
 extern bool IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects);

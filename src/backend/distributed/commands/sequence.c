@@ -270,7 +270,7 @@ PreprocessDropSequenceStmt(Node *node, const char *queryString,
 
 		if (!stmt->missing_ok && seqOid == InvalidOid)
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				/*
 				 * if the sequence is still invalid we couldn't find the sequence, error with the same
@@ -561,7 +561,7 @@ AlterSequenceSchemaStmtObjectAddress(Node *node, bool missing_ok)
 
 		if (!missing_ok && seqOid == InvalidOid)
 		{
-			if (!DisablePreconditions)
+			if (EnablePropagationWarnings)
 			{
 				/*
 				 * if the sequence is still invalid we couldn't find the sequence, error with the same

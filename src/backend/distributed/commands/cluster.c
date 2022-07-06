@@ -40,7 +40,7 @@ PreprocessClusterStmt(Node *node, const char *clusterCommand,
 
 	if (clusterStmt->relation == NULL)
 	{
-		if (!DisablePreconditions)
+		if (EnablePropagationWarnings)
 		{
 			ereport(WARNING, (errmsg("not propagating CLUSTER command to worker nodes"),
 							  errhint("Provide a specific table in order to CLUSTER "

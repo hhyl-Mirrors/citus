@@ -544,15 +544,6 @@ GetExplicitStatisticsSchemaIdList(Oid relationId)
 	List *schemaIdList = NIL;
 
 	Relation relation = RelationIdGetRelation(relationId);
-	if (!RelationIsValid(relation))
-	{
-		if (DisablePreconditions)
-		{
-			return NIL;
-		}
-
-		elog(ERROR, "could not open relation with OID %u", relationId);
-	}
 	List *statsIdList = RelationGetStatExtList(relation);
 	RelationClose(relation);
 

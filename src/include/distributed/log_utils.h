@@ -16,7 +16,7 @@
 #define CITUS_LOG_LEVEL_OFF 0
 
 
-extern bool DisablePreconditions;
+extern bool EnablePropagationWarnings;
 
 extern bool IsLoggableLevel(int logLevel);
 extern char * HashLogMessage(const char *text);
