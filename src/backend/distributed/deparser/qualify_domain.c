@@ -82,18 +82,18 @@ QualifyDropDomainStmt(Node *node)
 void
 QualifyAlterDomainStmt(Node *node)
 {
+	if (DisablePreconditions)
+	{
+		return;
+	}
+
 	AlterDomainStmt *stmt = castNode(AlterDomainStmt, node);
 
 	if (list_length(stmt->typeName) == 1)
 	{
 		TypeName *typeName = makeTypeNameFromNameList(stmt->typeName);
 		QualifyTypeName(typeName, false);
-
-		Oid constraintId = get_domain_constraint_oid(typeName->typeOid, stmt->name, true);
-		if (OidIsValid(constraintId))
-		{
-			stmt->typeName = typeName->names;
-		}
+		stmt->typeName = typeName->names;
 	}
 }
 

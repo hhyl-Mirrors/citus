@@ -68,16 +68,21 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 {
 	CheckCitusVersion(ERROR);
 
+	if (PG_ARGISNULL(0 || PG_ARGISNULL(1)))
+	{
+		PG_RETURN_BOOL(false);
+	}
+
 	Oid metaTableId = PG_GETARG_OID(0);
-	if (!OidIsValid(metaTableId))
+	Oid objectId = PG_GETARG_OID(1);
+
+	if (!OidIsValid(metaTableId) || !OidIsValid(objectId))
 	{
 		/* we cannot continue without valid meta table oid */
 		PG_RETURN_BOOL(false);
 	}
 
 	bool dependsOnCitus = false;
-
-	Oid objectId = PG_GETARG_OID(1);
 
 	DependentObjectsContext =
 		AllocSetContextCreate(
@@ -142,6 +147,10 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 		{
 			objectAdress.classId = RelationRelationId;
 
+			if (PG_ARGISNULL(2))
+			{
+				PG_RETURN_BOOL(false);
+			}
 			Oid typeId = PG_GETARG_OID(2);
 			ObjectAddress typeObjectAdress = { TypeRelationId, typeId, 0 };
 
@@ -436,10 +445,9 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 
 				if (OidIsValid(metaTableOid))
 				{
-					rangeTableEntry->securityQuals = list_concat(
-						rangeTableEntry->securityQuals,
-						list_make1(
-							CreateCitusDependentObjectExpr(varno, metaTableOid)));
+					query->jointree->quals = make_and_qual(
+						query->jointree->quals, CreateCitusDependentObjectExpr(varno,
+																			   metaTableOid));
 				}
 
 				MemoryContextSwitchTo(originalContext);
