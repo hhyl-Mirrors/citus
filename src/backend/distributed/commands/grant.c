@@ -94,8 +94,6 @@ PreprocessGrantStmt(Node *node, const char *queryString,
 				ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								errmsg("grant/revoke on column list is currently "
 									   "unsupported")));
-
-				return NIL;
 			}
 
 			Assert(priv->priv_name != NULL);

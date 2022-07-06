@@ -174,12 +174,8 @@ PreprocessDropStatisticsStmt(Node *node, const char *queryString,
 	List *objectNameList = NULL;
 	foreach_ptr(objectNameList, dropStatisticsStmt->objects)
 	{
-		Oid statsOid = get_statistics_object_oid(objectNameList, true);
-
-		if (!dropStatisticsStmt->missing_ok && !OidIsValid(statsOid))
-		{
-			return NIL;
-		}
+		Oid statsOid = get_statistics_object_oid(objectNameList,
+												 dropStatisticsStmt->missing_ok);
 
 		if (list_member_oid(processedStatsOids, statsOid))
 		{

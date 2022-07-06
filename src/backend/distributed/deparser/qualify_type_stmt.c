@@ -42,6 +42,10 @@ GetTypeNamespaceNameByNameList(List *names)
 	Oid typeOid = LookupTypeNameOid(NULL, typeName, true);
 	if (!OidIsValid(typeOid))
 	{
+		/*
+		 * Citus should not throw error for non-existing objects, let Postgres do that.
+		 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+		 */
 		return NULL;
 	}
 

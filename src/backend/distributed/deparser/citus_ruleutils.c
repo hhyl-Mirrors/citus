@@ -1039,12 +1039,7 @@ pg_get_indexclusterdef_string(Oid indexRelationId)
 										  0, 0, 0);
 	if (!HeapTupleIsValid(indexTuple))
 	{
-		if (EnablePropagationWarnings)
-		{
-			ereport(ERROR, (errmsg("cache lookup failed for index %u", indexRelationId)));
-		}
-
-		return NULL;
+		ereport(ERROR, (errmsg("cache lookup failed for index %u", indexRelationId)));
 	}
 
 	Form_pg_index indexForm = (Form_pg_index) GETSTRUCT(indexTuple);

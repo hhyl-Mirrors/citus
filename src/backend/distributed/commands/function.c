@@ -1390,10 +1390,7 @@ PostprocessCreateFunctionStmt(Node *node, const char *queryString)
 
 	if (errMsg != NULL)
 	{
-		if (EnablePropagationWarnings)
-		{
-			RaiseDeferredError(errMsg, WARNING);
-		}
+		RaiseDeferredError(errMsg, WARNING);
 		return NIL;
 	}
 

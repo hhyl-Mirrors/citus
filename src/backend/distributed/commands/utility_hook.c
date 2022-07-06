@@ -714,8 +714,6 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 								 errhint("Connect to worker nodes directly to manually "
 										 "rename the role")));
 			}
-
-			return;
 		}
 	}
 

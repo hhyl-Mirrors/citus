@@ -158,12 +158,9 @@ AppendAlterViewCmd(StringInfo buf, AlterTableCmd *alterTableCmd)
 
 		case AT_ColumnDefault:
 		{
-			if (EnablePropagationWarnings)
-			{
-				elog(ERROR,
-					 "Citus doesn't support setting or resetting default values for a "
-					 "column of view");
-			}
+			elog(ERROR,
+				 "Citus doesn't support setting or resetting default values for a "
+				 "column of view");
 
 			break;
 		}

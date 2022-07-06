@@ -127,10 +127,11 @@ QualifyDropSequenceStmt(Node *node)
 
 			if (!stmt->missing_ok && !OidIsValid(seqOid))
 			{
-				if (!EnablePropagationWarnings)
-				{
-					return;
-				}
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
+				return;
 			}
 
 			if (OidIsValid(seqOid))

@@ -45,6 +45,10 @@ QualifyDropViewStmt(Node *node)
 										   true);
 			if (!stmt->missing_ok && !OidIsValid(viewOid))
 			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
 				return;
 			}
 

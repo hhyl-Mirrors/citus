@@ -527,13 +527,8 @@ GetIndexCommandListForShardBackingReplicaIdentity(Oid relationId, uint64 shardId
 			SearchSysCache1(INDEXRELID, ObjectIdGetDatum(replicaIdentityIndex));
 		if (!HeapTupleIsValid(indexTuple))
 		{
-			if (EnablePropagationWarnings)
-			{
-				/* should not happen */
-				elog(ERROR, "cache lookup failed for index %u", replicaIdentityIndex);
-			}
-
-			return NIL;
+			/* should not happen */
+			elog(ERROR, "cache lookup failed for index %u", replicaIdentityIndex);
 		}
 
 		Form_pg_index indexForm = ((Form_pg_index) GETSTRUCT(indexTuple));

@@ -57,6 +57,10 @@ QualifyDropTextSearchConfigurationStmt(Node *node)
 			Oid tsconfigOid = get_ts_config_oid(objName, true);
 			if (!OidIsValid(tsconfigOid))
 			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
 				return;
 			}
 
@@ -100,6 +104,10 @@ QualifyDropTextSearchDictionaryStmt(Node *node)
 			Oid tsdictOid = get_ts_dict_oid(objName, true);
 			if (!OidIsValid(tsdictOid))
 			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
 				return;
 			}
 

@@ -447,12 +447,9 @@ AlterTypeSchemaStmtObjectAddress(Node *node, bool missing_ok)
 		 */
 		if (!missing_ok && typeOid == InvalidOid)
 		{
-			if (EnablePropagationWarnings)
-			{
-				ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT),
-								errmsg("type \"%s\" does not exist",
-									   TypeNameToString(typeName))));
-			}
+			ereport(ERROR, (errcode(ERRCODE_UNDEFINED_OBJECT),
+							errmsg("type \"%s\" does not exist",
+								   TypeNameToString(typeName))));
 		}
 	}
 

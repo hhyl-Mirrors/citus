@@ -268,22 +268,12 @@ PreprocessDropSequenceStmt(Node *node, const char *queryString,
 
 		Oid seqOid = RangeVarGetRelid(seq, NoLock, true);
 
-		if (!stmt->missing_ok && seqOid == InvalidOid)
+		if (!stmt->missing_ok && !OidIsValid(seqOid))
 		{
-			if (EnablePropagationWarnings)
-			{
-				/*
-				 * if the sequence is still invalid we couldn't find the sequence, error with the same
-				 * message postgres would error with if missing_ok is false (not ok to miss)
-				 */
-				const char *quotedSequenceName =
-					quote_qualified_identifier(seq->schemaname, seq->relname);
-
-				ereport(ERROR, (errcode(ERRCODE_UNDEFINED_TABLE),
-								errmsg("relation \"%s\" does not exist",
-									   quotedSequenceName)));
-			}
-
+			/*
+			 * Citus should not throw error for non-existing objects, let Postgres do that.
+			 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+			 */
 			return NIL;
 		}
 
@@ -561,19 +551,16 @@ AlterSequenceSchemaStmtObjectAddress(Node *node, bool missing_ok)
 
 		if (!missing_ok && seqOid == InvalidOid)
 		{
-			if (EnablePropagationWarnings)
-			{
-				/*
-				 * if the sequence is still invalid we couldn't find the sequence, error with the same
-				 * message postgres would error with if missing_ok is false (not ok to miss)
-				 */
-				const char *quotedSequenceName =
-					quote_qualified_identifier(sequence->schemaname, sequence->relname);
+			/*
+			 * if the sequence is still invalid we couldn't find the sequence, error with the same
+			 * message postgres would error with if missing_ok is false (not ok to miss)
+			 */
+			const char *quotedSequenceName =
+				quote_qualified_identifier(sequence->schemaname, sequence->relname);
 
-				ereport(ERROR, (errcode(ERRCODE_UNDEFINED_TABLE),
-								errmsg("relation \"%s\" does not exist",
-									   quotedSequenceName)));
-			}
+			ereport(ERROR, (errcode(ERRCODE_UNDEFINED_TABLE),
+							errmsg("relation \"%s\" does not exist",
+								   quotedSequenceName)));
 		}
 	}
 

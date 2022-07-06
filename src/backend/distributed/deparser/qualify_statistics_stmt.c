@@ -81,12 +81,8 @@ QualifyDropStatisticsStmt(Node *node)
 
 		if (stat->schemaname == NULL)
 		{
-			Oid statsOid = get_statistics_object_oid(objectNameList, true);
-
-			if (!dropStatisticsStmt->missing_ok && !OidIsValid(statsOid))
-			{
-				return;
-			}
+			Oid statsOid = get_statistics_object_oid(objectNameList,
+													 dropStatisticsStmt->missing_ok);
 
 			if (OidIsValid(statsOid))
 			{

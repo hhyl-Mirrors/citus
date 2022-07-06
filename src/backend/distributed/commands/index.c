@@ -328,13 +328,8 @@ ExecuteFunctionOnEachTableIndex(Oid relationId, PGIndexProcessor pgIndexProcesso
 		HeapTuple indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexId));
 		if (!HeapTupleIsValid(indexTuple))
 		{
-			if (EnablePropagationWarnings)
-			{
-				ereport(ERROR, (errmsg("cache lookup failed for index with oid %u",
-									   indexId)));
-			}
-
-			return NIL;
+			ereport(ERROR, (errmsg("cache lookup failed for index with oid %u",
+								   indexId)));
 		}
 
 		Form_pg_index indexForm = (Form_pg_index) GETSTRUCT(indexTuple);
@@ -566,6 +561,10 @@ PreprocessReindexStmt(Node *node, const char *reindexCommand,
 												  &state);
 			if (!OidIsValid(indOid))
 			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
 				return NIL;
 			}
 
@@ -579,6 +578,10 @@ PreprocessReindexStmt(Node *node, const char *reindexCommand,
 												  RangeVarCallbackOwnsTable, NULL);
 			if (!OidIsValid(indOid))
 			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
 				return NIL;
 			}
 
