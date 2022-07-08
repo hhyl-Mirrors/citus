@@ -57,6 +57,7 @@ bool HideCitusDependentObjects = false;
 /* memory context for allocating DependentObjects */
 static MemoryContext DependentObjectsContext = NULL;
 
+static bool IsCitusDependedType(ObjectAddress typeObjectAddress);
 static Node * CreateCitusDependentObjectExpr(int pgMetaTableVarno, int pgMetaTableOid);
 static List * GetFuncArgs(int pgMetaTableVarno, int pgMetaTableOid);
 
@@ -99,8 +100,7 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 
 	switch (metaTableId)
 	{
-		/* handle meta objects whose oids are found in pg_depend */
-		case RelationRelationId:
+		/* meta classes that access their own oid */
 		case ProcedureRelationId:
 		case AccessMethodRelationId:
 		case EventTriggerRelationId:
@@ -113,52 +113,52 @@ is_citus_depended_object(PG_FUNCTION_ARGS)
 		case AttrDefaultRelationId:
 		case NamespaceRelationId:
 		case ConstraintRelationId:
+		case RelationRelationId:
+		{
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
+			break;
+		}
+
 		case TypeRelationId:
 		{
-			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
+			/*
+			 * we do not access only the typoid in pg_type, we also access typreloid
+			 * to see if type's relation depends on citus, so the type does.
+			 * we always have to access typoid because not all types have a valid
+			 * relation oid (e.g. array, enum).
+			 */
+			dependsOnCitus = IsCitusDependedType(objectAdress);
 			break;
 		}
 
-		/*
-		 * handle meta objects whose oids are not found in pg_depend,
-		 * but their relations', types', or procedures'
-		 */
-		case SequenceRelationId:
-		case StatisticRelationId:
-		case IndexRelationId:
-		{
-			objectAdress.classId = RelationRelationId;
-			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
-			break;
-		}
-
+		/* meta classes that access their typeoid */
 		case EnumRelationId:
 		{
+			/*
+			 * we do not directly access the oid in pg_enum,
+			 * because it does not exist in pg_depend, but its type does
+			 */
 			objectAdress.classId = TypeRelationId;
 			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
-		case AggregateRelationId:
+		/* meta classes that access their relation oid */
+		case IndexRelationId:
+		case AttributeRelationId:
+		case SequenceRelationId:
+		case StatisticRelationId:
 		{
-			objectAdress.classId = ProcedureRelationId;
+			objectAdress.classId = RelationRelationId;
 			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
-		case AttributeRelationId:
+		/* meta classes that access their procedure oid */
+		case AggregateRelationId:
 		{
-			objectAdress.classId = RelationRelationId;
-
-			if (PG_ARGISNULL(2))
-			{
-				PG_RETURN_BOOL(false);
-			}
-			Oid typeId = PG_GETARG_OID(2);
-			ObjectAddress typeObjectAdress = { TypeRelationId, typeId, 0 };
-
-			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL) ||
-							 IsCitusDependentObject(typeObjectAdress, NULL);
+			objectAdress.classId = ProcedureRelationId;
+			dependsOnCitus = IsCitusDependentObject(objectAdress, NULL);
 			break;
 		}
 
@@ -261,6 +261,43 @@ IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects)
 
 
 /*
+ * IsCitusDependedType returns true if the type with given object address depends on citus.
+ */
+static bool
+IsCitusDependedType(ObjectAddress typeObjectAddress)
+{
+	HeapTuple typeTuple = SearchSysCache1(TYPEOID, typeObjectAddress.objectId);
+
+	if (!HeapTupleIsValid(typeTuple))
+	{
+		return false;
+	}
+
+	Form_pg_type typeForm = (Form_pg_type) GETSTRUCT(typeTuple);
+	Oid typeRelationId = typeForm->typrelid;
+
+	ReleaseSysCache(typeTuple);
+
+	/* check if type directly depends on citus */
+	if (IsCitusDependentObject(typeObjectAddress, NULL))
+	{
+		return true;
+	}
+
+	/* check if type's relation depends on citus, so type does indirectly */
+	if (OidIsValid(typeRelationId))
+	{
+		ObjectAddress typeRelationObjectAddress = {
+			RelationRelationId, typeRelationId, 0
+		};
+		return IsCitusDependentObject(typeRelationObjectAddress, NULL);
+	}
+
+	return false;
+}
+
+
+/*
  * HideCitusDependentObjectsFromPgMetaTable adds a NOT is_citus_depended_object(oid, oid, smallint) expr
  * to the security quals of meta class RTEs.
  */
@@ -306,141 +343,65 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 				{
 					/* pg_class */
 					case RelationRelationId:
-					{
-						metaTableOid = RelationRelationId;
-						break;
-					}
 
 					/* pg_proc */
 					case ProcedureRelationId:
-					{
-						metaTableOid = ProcedureRelationId;
-						break;
-					}
 
 					/* pg_am */
 					case AccessMethodRelationId:
-					{
-						metaTableOid = AccessMethodRelationId;
-						break;
-					}
 
 					/* pg_type */
 					case TypeRelationId:
-					{
-						metaTableOid = TypeRelationId;
-						break;
-					}
 
 					/* pg_enum */
 					case EnumRelationId:
-					{
-						metaTableOid = EnumRelationId;
-						break;
-					}
 
 					/* pg_event_trigger */
 					case EventTriggerRelationId:
-					{
-						metaTableOid = EventTriggerRelationId;
-						break;
-					}
 
 					/* pg_trigger */
 					case TriggerRelationId:
-					{
-						metaTableOid = TriggerRelationId;
-						break;
-					}
 
 					/* pg_rewrite */
 					case RewriteRelationId:
-					{
-						metaTableOid = RewriteRelationId;
-						break;
-					}
 
 					/* pg_attrdef */
 					case AttrDefaultRelationId:
-					{
-						metaTableOid = AttrDefaultRelationId;
-						break;
-					}
 
 					/* pg_constraint */
 					case ConstraintRelationId:
-					{
-						metaTableOid = ConstraintRelationId;
-						break;
-					}
 
 					/* pg_ts_config */
 					case TSConfigRelationId:
-					{
-						metaTableOid = TSConfigRelationId;
-						break;
-					}
 
 					/* pg_ts_template */
 					case TSTemplateRelationId:
-					{
-						metaTableOid = TSTemplateRelationId;
-						break;
-					}
 
 					/* pg_ts_dict */
 					case TSDictionaryRelationId:
-					{
-						metaTableOid = TSDictionaryRelationId;
-						break;
-					}
 
 					/* pg_language */
 					case LanguageRelationId:
-					{
-						metaTableOid = LanguageRelationId;
-						break;
-					}
 
 					/* pg_namespace */
 					case NamespaceRelationId:
-					{
-						metaTableOid = NamespaceRelationId;
-						break;
-					}
 
 					/* pg_sequence */
 					case SequenceRelationId:
-					{
-						metaTableOid = SequenceRelationId;
-						break;
-					}
 
 					/* pg_statistic */
 					case StatisticRelationId:
-					{
-						metaTableOid = StatisticRelationId;
-						break;
-					}
 
 					/* pg_attribute */
 					case AttributeRelationId:
-					{
-						metaTableOid = AttributeRelationId;
-						break;
-					}
 
 					/* pg_index */
 					case IndexRelationId:
-					{
-						metaTableOid = IndexRelationId;
-						break;
-					}
 
 					/* pg_aggregate */
 					case AggregateRelationId:
 					{
-						metaTableOid = AggregateRelationId;
+						metaTableOid = rangeTableEntry->relid;
 						break;
 					}
 
@@ -515,33 +476,162 @@ CreateCitusDependentObjectExpr(int pgMetaTableVarno, int pgMetaTableOid)
 static List *
 GetFuncArgs(int pgMetaTableVarno, int pgMetaTableOid)
 {
+	/*
+	 * set attribute number for the oid, which we are insterest in, inside pg meta tables.
+	 * We are accessing the 1. col(their own oid or their relation's oid) to get the related
+	 * object's oid for all of the pg meta tables except pg_enum. For pg_enum and pg_index classes,
+	 * we access their 2. col(their type's oid) to see if their type depends on citus, so it does.
+	 */
+	AttrNumber oidAttNum = 1;
+	if (pgMetaTableOid == EnumRelationId || pgMetaTableOid == IndexRelationId)
+	{
+		oidAttNum = 2;
+	}
+
+	/* create const for meta table oid */
 	Const *metaTableOidConst = makeConst(OIDOID, -1, InvalidOid, sizeof(Oid),
 										 ObjectIdGetDatum(pgMetaTableOid),
 										 false, true);
 
-	AttrNumber oidAttNum = (pgMetaTableOid == IndexRelationId ||
-							pgMetaTableOid == EnumRelationId) ? 2 : 1;
-
+	/*
+	 * create a var for the oid that we are interested in,
+	 * col type should be regproc for pg_aggregate table; else oid
+	 */
 	Var *oidVar = makeVar(pgMetaTableVarno, oidAttNum,
 						  (pgMetaTableOid == AggregateRelationId) ? REGPROCOID : OIDOID,
 						  -1, InvalidOid, 0);
 
-	if (pgMetaTableOid == AttributeRelationId)
-	{
-		AttrNumber typOidAttNum = 3;
-		Var *typeOidVar = makeVar(pgMetaTableVarno, typOidAttNum, OIDOID, -1, InvalidOid,
-								  0);
+	return list_make2((Node *) metaTableOidConst, (Node *) oidVar);
+}
 
-		return list_make3((Node *) metaTableOidConst, (Node *) oidVar,
-						  (Node *) typeOidVar);
-	}
-	else
-	{
-		Const *dummyTypeOidConst = makeConst(OIDOID, -1, InvalidOid, sizeof(Oid),
-											 ObjectIdGetDatum(InvalidOid),
-											 false, true);
 
-		return list_make3((Node *) metaTableOidConst, (Node *) oidVar,
-						  (Node *) dummyTypeOidConst);
+/*
+ * ShouldCheckObjectValidity decides if we should validate a distributed object.
+ * Currently, we added all objects which cause postgres vanilla tests to fail
+ * bacause the citus logs in their preprocess, qualify or postprocess steps breaks postgres vanilla
+ * tests. In utility_hook, we set validity of the object to false in case an invalid object address
+ * is returned from object's address callback. Then, we do not let citus execute preprocess,
+ * qualify and postprocess steps for the object if it is not valid. We check objects'
+ * validity only if this method returns true.
+ */
+bool
+ShouldCheckObjectValidity(Node *node)
+{
+	/*
+	 * If we set EnablePropagationWarnings true,
+	 * we do not prevent citus warnings in preprocess, qualify and postprocess steps.
+	 */
+	if (EnablePropagationWarnings)
+	{
+		return false;
 	}
+
+	switch (nodeTag(node))
+	{
+		case T_AlterDomainStmt:
+		{
+			return true;
+		}
+
+		case T_ReindexStmt:
+		{
+			return true;
+		}
+
+		case T_AlterEnumStmt:
+		{
+			return true;
+		}
+
+		case T_DropStmt:
+		{
+			DropStmt *dropStmt = castNode(DropStmt, node);
+
+			switch (dropStmt->removeType)
+			{
+				case OBJECT_SEQUENCE:
+				case OBJECT_STATISTIC_EXT:
+				case OBJECT_VIEW:
+				case OBJECT_TSDICTIONARY:
+				case OBJECT_TSCONFIGURATION:
+				{
+					return true;
+				}
+
+				default:
+				{
+					return false;
+				}
+			}
+		}
+
+		case T_RenameStmt:
+		{
+			RenameStmt *renameStmt = castNode(RenameStmt, node);
+
+			switch (renameStmt->renameType)
+			{
+				case OBJECT_TYPE:
+				{
+					return true;
+				}
+
+				case OBJECT_ATTRIBUTE:
+				{
+					if (renameStmt->relationType == OBJECT_TYPE)
+					{
+						return true;
+					}
+
+					return false;
+				}
+
+				default:
+				{
+					return false;
+				}
+			}
+		}
+
+		case T_AlterTableStmt:
+		{
+			AlterTableStmt *alterTableStmt = castNode(AlterTableStmt, node);
+			if (AlterTableStmtObjType_compat(alterTableStmt) == OBJECT_TYPE)
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		case T_AlterOwnerStmt:
+		{
+			AlterOwnerStmt *alterOwnerStmt = castNode(AlterOwnerStmt, node);
+			if (alterOwnerStmt->objectType == OBJECT_TYPE)
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		case T_AlterObjectSchemaStmt:
+		{
+			AlterObjectSchemaStmt *alterObjectSchemaStmt = castNode(AlterObjectSchemaStmt,
+																	node);
+			if (alterObjectSchemaStmt->objectType == OBJECT_TYPE)
+			{
+				return true;
+			}
+
+			return false;
+		}
+
+		default:
+		{
+			return false;
+		}
+	}
+
+	return false;
 }

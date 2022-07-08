@@ -157,10 +157,8 @@ AppendAlterViewCmd(StringInfo buf, AlterTableCmd *alterTableCmd)
 
 		case AT_ColumnDefault:
 		{
-			elog(ERROR,
-				 "Citus doesn't support setting or resetting default values for a "
-				 "column of view");
-
+			elog(ERROR, "Citus doesn't support setting or resetting default values for a "
+						"column of view");
 			break;
 		}
 

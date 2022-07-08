@@ -2907,7 +2907,7 @@ CitusDependentObjectFuncId(void)
 {
 	if (MetadataCache.CitusDependentObjectFuncId == InvalidOid)
 	{
-		const int argCount = 3;
+		const int argCount = 2;
 
 		MetadataCache.CitusDependentObjectFuncId =
 			FunctionOid("pg_catalog", "is_citus_depended_object", argCount);

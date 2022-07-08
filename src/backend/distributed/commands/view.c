@@ -110,6 +110,10 @@ PostprocessViewStmt(Node *node, const char *queryString)
 		return NIL;
 	}
 
+	/*
+	 * We normally distribute views like `CREATE VIEW v1 AS SELECT 1`,
+	 * but when DistributeLocalViews is set false, we do not.
+	 */
 	if (!DistributeLocalViews)
 	{
 		bool hasDistDependency = false;
@@ -118,10 +122,6 @@ PostprocessViewStmt(Node *node, const char *queryString)
 
 		foreach_ptr(dependency, dependencies)
 		{
-			/*
-			 * We normally distribute views like `CREATE VIEW v1 AS SELECT 1`,
-			 * but when DistributeLocalViews is set false, we do not.
-			 */
 			if (IsObjectDistributed(dependency))
 			{
 				hasDistDependency = true;

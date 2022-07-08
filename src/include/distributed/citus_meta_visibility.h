@@ -22,6 +22,7 @@ extern bool HideCitusDependentObjects;
 extern bool HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context);
 extern bool IsPgLocksTable(RangeTblEntry *rte);
 extern bool IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects);
+extern bool ShouldCheckObjectValidity(Node *node);
 
 
 #endif /* CITUS_META_VISIBILITY_H */

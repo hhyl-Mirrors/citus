@@ -1202,7 +1202,10 @@ CitusExplainOneQuery(Query *query, int cursorOptions, IntoClause *into,
 
 	INSTR_TIME_SET_CURRENT(planstart);
 
-	/* we should not hide any objects while explain some query to not break postgres vanilla tests */
+	/*
+	 * we should not hide any objects while explaining some query to not break
+	 * postgres vanilla tests
+	 */
 	bool oldHideCitusDependentObjects = HideCitusDependentObjects;
 	HideCitusDependentObjects = false;
 	PlannedStmt *plan = NULL;

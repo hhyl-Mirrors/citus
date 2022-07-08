@@ -1097,7 +1097,7 @@ SELECT * FROM multi_extension.print_extension_changes();
  table columnar.stripe                                                                  |
                                                                                         | function columnar.get_storage_id(regclass) bigint
                                                                                         | function columnar_internal.columnar_handler(internal) table_am_handler
-                                                                                        | function is_citus_depended_object(oid,oid,oid) boolean
+                                                                                        | function is_citus_depended_object(oid,oid) boolean
                                                                                         | schema columnar_internal
                                                                                         | sequence columnar_internal.storageid_seq
                                                                                         | table columnar_internal.chunk
