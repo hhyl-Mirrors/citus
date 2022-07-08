@@ -29,7 +29,7 @@
 # core dumps
 core
 
-# postgres vanilla test's output sqls
+# postgres vanilla test's outputs
 constraints.sql
 copy.sql
 create_function_0.sql

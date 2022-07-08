@@ -20,7 +20,6 @@
 #include "distributed/commands.h"
 #include "distributed/deparser.h"
 #include "distributed/listutils.h"
-#include "distributed/log_utils.h"
 #include "distributed/version_compat.h"
 #include "parser/parse_func.h"
 #include "utils/lsyscache.h"
@@ -123,16 +122,7 @@ QualifyDropSequenceStmt(Node *node)
 
 		if (seq->schemaname == NULL)
 		{
-			Oid seqOid = RangeVarGetRelid(seq, NoLock, true);
-
-			if (!stmt->missing_ok && !OidIsValid(seqOid))
-			{
-				/*
-				 * Citus should not throw error for non-existing objects, let Postgres do that.
-				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-				 */
-				return;
-			}
+			Oid seqOid = RangeVarGetRelid(seq, NoLock, stmt->missing_ok);
 
 			if (OidIsValid(seqOid))
 			{

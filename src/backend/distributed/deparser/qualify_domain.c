@@ -15,7 +15,6 @@
 
 #include "catalog/namespace.h"
 #include "catalog/pg_collation.h"
-#include "catalog/pg_constraint.h"
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_type.h"

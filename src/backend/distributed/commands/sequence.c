@@ -266,16 +266,7 @@ PreprocessDropSequenceStmt(Node *node, const char *queryString,
 	{
 		RangeVar *seq = makeRangeVarFromNameList(objectNameList);
 
-		Oid seqOid = RangeVarGetRelid(seq, NoLock, true);
-
-		if (!stmt->missing_ok && !OidIsValid(seqOid))
-		{
-			/*
-			 * Citus should not throw error for non-existing objects, let Postgres do that.
-			 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-			 */
-			return NIL;
-		}
+		Oid seqOid = RangeVarGetRelid(seq, NoLock, stmt->missing_ok);
 
 		ObjectAddress sequenceAddress = { 0 };
 		ObjectAddressSet(sequenceAddress, RelationRelationId, seqOid);
@@ -325,6 +316,39 @@ PreprocessDropSequenceStmt(Node *node, const char *queryString,
 								ENABLE_DDL_PROPAGATION);
 
 	return NodeDDLTaskList(NON_COORDINATOR_METADATA_NODES, commands);
+}
+
+
+/*
+ * SequenceDropStmtObjectAddress returns object address for drop sequence stmt.
+ */
+extern ObjectAddress
+SequenceDropStmtObjectAddress(Node *stmt, bool missing_ok)
+{
+	DropStmt *dropSeqStmt = castNode(DropStmt, stmt);
+
+	ObjectAddress objectAddress = { RelationRelationId, InvalidOid, 0 };
+
+	List *deletingSequencesList = dropSeqStmt->objects;
+	List *objectNameList = NULL;
+	foreach_ptr(objectNameList, deletingSequencesList)
+	{
+		RangeVar *seq = makeRangeVarFromNameList(objectNameList);
+
+		Oid seqOid = RangeVarGetRelid(seq, NoLock, missing_ok);
+		if (!OidIsValid(seqOid))
+		{
+			/*
+			 * Citus should not throw error for non-existing objects, let Postgres do that.
+			 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+			 */
+			return InvalidObjectAddress;
+		}
+
+		objectAddress.objectId = seqOid;
+	}
+
+	return objectAddress;
 }
 
 

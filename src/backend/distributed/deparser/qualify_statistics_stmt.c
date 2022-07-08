@@ -14,17 +14,14 @@
 
 #include "postgres.h"
 
-#include "access/relation.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_statistic_ext.h"
 #include "distributed/commands.h"
 #include "distributed/deparser.h"
 #include "distributed/listutils.h"
-#include "miscadmin.h"
 #include "nodes/parsenodes.h"
 #include "nodes/value.h"
 #include "utils/syscache.h"
-#include "distributed/log_utils.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/relcache.h"
@@ -86,12 +83,6 @@ QualifyDropStatisticsStmt(Node *node)
 
 			if (OidIsValid(statsOid))
 			{
-				/* user should own the statistic object */
-				if (!pg_statistics_object_ownercheck(statsOid, GetUserId()))
-				{
-					return;
-				}
-
 				Oid schemaOid = GetStatsNamespaceOid(statsOid);
 				stat->schemaname = get_namespace_name(schemaOid);
 			}

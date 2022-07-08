@@ -20,7 +20,7 @@
 extern bool HideCitusDependentObjects;
 
 extern bool HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context);
-extern bool HasPgLocksTable(List *rtes);
+extern bool IsPgLocksTable(RangeTblEntry *rte);
 extern bool IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects);
 
 

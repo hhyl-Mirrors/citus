@@ -556,34 +556,16 @@ PreprocessReindexStmt(Node *node, const char *reindexCommand,
 			state.locked_table_oid = InvalidOid;
 
 			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation,
-												  lockmode, RVR_MISSING_OK,
+												  lockmode, 0,
 												  RangeVarCallbackForReindexIndex,
 												  &state);
-			if (!OidIsValid(indOid))
-			{
-				/*
-				 * Citus should not throw error for non-existing objects, let Postgres do that.
-				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-				 */
-				return NIL;
-			}
-
 			relation = index_open(indOid, NoLock);
 			relationId = IndexGetRelation(indOid, false);
 		}
 		else
 		{
-			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation, lockmode,
-												  RVR_MISSING_OK,
-												  RangeVarCallbackOwnsTable, NULL);
-			if (!OidIsValid(indOid))
-			{
-				/*
-				 * Citus should not throw error for non-existing objects, let Postgres do that.
-				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-				 */
-				return NIL;
-			}
+			RangeVarGetRelidExtended(reindexStatement->relation, lockmode, 0,
+									 RangeVarCallbackOwnsTable, NULL);
 
 			relation = table_openrv(reindexStatement->relation, NoLock);
 			relationId = RelationGetRelid(relation);
@@ -638,6 +620,66 @@ PreprocessReindexStmt(Node *node, const char *reindexCommand,
 	}
 
 	return ddlJobs;
+}
+
+
+/*
+ * ReindexStmtObjectAddress returns object address for the reindex stmt
+ */
+ObjectAddress
+ReindexStmtObjectAddress(Node *stmt, bool missing_ok)
+{
+	ReindexStmt *reindexStatement = castNode(ReindexStmt, stmt);
+
+	ObjectAddress objectAddress = { IndexRelationId, InvalidOid, 0 };
+
+	if (reindexStatement->relation != NULL)
+	{
+		LOCKMODE lockmode = IsReindexWithParam_compat(reindexStatement, "concurrently") ?
+							ShareUpdateExclusiveLock : AccessExclusiveLock;
+		if (reindexStatement->kind == REINDEX_OBJECT_INDEX)
+		{
+			struct ReindexIndexCallbackState state;
+			state.concurrent = IsReindexWithParam_compat(reindexStatement,
+														 "concurrently");
+			state.locked_table_oid = InvalidOid;
+
+			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation, lockmode,
+												  (missing_ok) ? RVR_MISSING_OK : 0,
+												  RangeVarCallbackForReindexIndex,
+												  &state);
+
+			if (!OidIsValid(indOid))
+			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
+				return InvalidObjectAddress;
+			}
+
+			objectAddress.objectId = indOid;
+		}
+		else
+		{
+			Oid indOid = RangeVarGetRelidExtended(reindexStatement->relation, lockmode,
+												  RVR_MISSING_OK,
+												  RangeVarCallbackOwnsTable, NULL);
+
+			if (!OidIsValid(indOid))
+			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
+				return InvalidObjectAddress;
+			}
+
+			objectAddress.objectId = indOid;
+		}
+	}
+
+	return objectAddress;
 }
 
 

@@ -14,7 +14,6 @@
 #include "catalog/namespace.h"
 #include "distributed/deparser.h"
 #include "distributed/listutils.h"
-#include "distributed/log_utils.h"
 #include "nodes/nodes.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
@@ -42,15 +41,7 @@ QualifyDropViewStmt(Node *node)
 		{
 			RangeVar *viewRangeVar = makeRangeVarFromNameList(possiblyQualifiedViewName);
 			Oid viewOid = RangeVarGetRelid(viewRangeVar, AccessExclusiveLock,
-										   true);
-			if (!stmt->missing_ok && !OidIsValid(viewOid))
-			{
-				/*
-				 * Citus should not throw error for non-existing objects, let Postgres do that.
-				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-				 */
-				return;
-			}
+										   stmt->missing_ok);
 
 			/*
 			 * If DROP VIEW IF EXISTS called and the view doesn't exist, oid can be invalid.

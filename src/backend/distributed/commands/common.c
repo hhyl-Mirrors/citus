@@ -226,7 +226,6 @@ PreprocessDropDistributedObjectStmt(Node *node, const char *queryString,
 		Relation rel = NULL; /* not used, but required to pass to get_object_address */
 		ObjectAddress address = get_object_address(stmt->removeType, object, &rel,
 												   AccessShareLock, stmt->missing_ok);
-
 		if (IsObjectDistributed(&address))
 		{
 			ObjectAddress *addressPtr = palloc0(sizeof(ObjectAddress));
@@ -275,4 +274,72 @@ PreprocessDropDistributedObjectStmt(Node *node, const char *queryString,
 								ENABLE_DDL_PROPAGATION);
 
 	return NodeDDLTaskList(NON_COORDINATOR_NODES, commands);
+}
+
+
+/*
+ * DropTextSearchDictObjectAddress returns object address for the drop TextSearchDict stmt.
+ */
+ObjectAddress
+DropTextSearchDictObjectAddress(Node *node, bool missing_ok)
+{
+	DropStmt *stmt = castNode(DropStmt, node);
+
+	ObjectAddress objectAddress = { InvalidOid, InvalidOid, 0 };
+
+	List *objName = NIL;
+
+	foreach_ptr(objName, stmt->objects)
+	{
+		char *schemaName = NULL;
+		char *tsdictName = NULL;
+		DeconstructQualifiedName(objName, &schemaName, &tsdictName);
+
+		if (!schemaName)
+		{
+			/*
+			 * Citus should not throw error for non-existing objects, let Postgres do that.
+			 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+			 */
+			Oid tsdictOid = get_ts_dict_oid(objName, missing_ok);
+			if (OidIsValid(tsdictOid))
+			{
+				objectAddress.objectId = tsdictOid;
+			}
+		}
+	}
+
+	return objectAddress;
+}
+
+
+/*
+ * DropTextSearchConfigObjectAddress returns object address for the drop TextSearchConfig stmt.
+ */
+ObjectAddress
+DropTextSearchConfigObjectAddress(Node *node, bool missing_ok)
+{
+	DropStmt *stmt = castNode(DropStmt, node);
+
+	ObjectAddress objectAddress = { InvalidOid, InvalidOid, 0 };
+
+	List *objName = NIL;
+
+	foreach_ptr(objName, stmt->objects)
+	{
+		char *schemaName = NULL;
+		char *tsconfigName = NULL;
+		DeconstructQualifiedName(objName, &schemaName, &tsconfigName);
+
+		if (!schemaName)
+		{
+			Oid tsconfigOid = get_ts_config_oid(objName, missing_ok);
+			if (OidIsValid(tsconfigOid))
+			{
+				objectAddress.objectId = tsconfigOid;
+			}
+		}
+	}
+
+	return objectAddress;
 }

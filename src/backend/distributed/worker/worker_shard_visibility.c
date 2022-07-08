@@ -459,10 +459,8 @@ FilterShardsFromPgclass(Node *node, void *context)
 			MemoryContext originalContext = MemoryContextSwitchTo(queryContext);
 
 			/* add NOT relation_is_a_known_shard(oid) to the security quals of the RTE */
-			rangeTableEntry->securityQuals = list_concat(rangeTableEntry->securityQuals,
-														 list_make1(
-															 CreateRelationIsAKnownShardFilter(
-																 varno)));
+			rangeTableEntry->securityQuals =
+				list_make1(CreateRelationIsAKnownShardFilter(varno));
 
 			MemoryContextSwitchTo(originalContext);
 		}

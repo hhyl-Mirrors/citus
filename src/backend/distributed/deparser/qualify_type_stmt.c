@@ -25,7 +25,6 @@
 #include "catalog/pg_type.h"
 #include "distributed/commands.h"
 #include "distributed/deparser.h"
-#include "distributed/log_utils.h"
 #include "distributed/version_compat.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_type.h"
@@ -39,16 +38,7 @@ char *
 GetTypeNamespaceNameByNameList(List *names)
 {
 	TypeName *typeName = makeTypeNameFromNameList(names);
-	Oid typeOid = LookupTypeNameOid(NULL, typeName, true);
-	if (!OidIsValid(typeOid))
-	{
-		/*
-		 * Citus should not throw error for non-existing objects, let Postgres do that.
-		 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
-		 */
-		return NULL;
-	}
-
+	Oid typeOid = LookupTypeNameOid(NULL, typeName, false);
 	Oid namespaceOid = TypeOidGetNamespaceOid(typeOid);
 	char *nspname = get_namespace_name_or_temp(namespaceOid);
 	return nspname;
@@ -139,10 +129,7 @@ QualifyAlterTypeStmt(Node *node)
 	{
 		List *names = MakeNameListFromRangeVar(stmt->relation);
 		char *nspname = GetTypeNamespaceNameByNameList(names);
-		if (nspname)
-		{
-			stmt->relation->schemaname = nspname;
-		}
+		stmt->relation->schemaname = nspname;
 	}
 }
 

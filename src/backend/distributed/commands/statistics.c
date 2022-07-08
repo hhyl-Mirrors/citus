@@ -210,6 +210,44 @@ PreprocessDropStatisticsStmt(Node *node, const char *queryString,
 
 
 /*
+ * DropStatisticsObjectAddress returns the object address for drop statistic statement.
+ */
+ObjectAddress
+DropStatisticsObjectAddress(Node *node, bool missing_ok)
+{
+	DropStmt *dropStatisticsStmt = castNode(DropStmt, node);
+	Assert(dropStatisticsStmt->removeType == OBJECT_STATISTIC_EXT);
+
+	ObjectAddress objectAddress = { StatisticExtRelationId, InvalidOid, 0 };
+	List *objectNameList = NULL;
+	foreach_ptr(objectNameList, dropStatisticsStmt->objects)
+	{
+		RangeVar *stat = makeRangeVarFromNameList(objectNameList);
+
+		if (stat->schemaname == NULL)
+		{
+			Oid statsOid = get_statistics_object_oid(objectNameList,
+													 dropStatisticsStmt->missing_ok);
+
+			if (OidIsValid(statsOid))
+			{
+				/* user should own the statistic object */
+				if (!pg_statistics_object_ownercheck(statsOid, GetUserId()))
+				{
+					return InvalidObjectAddress;
+				}
+
+				objectAddress.objectId = statsOid;
+				break;
+			}
+		}
+	}
+
+	return objectAddress;
+}
+
+
+/*
  * PreprocessAlterStatisticsRenameStmt is called during the planning phase for
  * ALTER STATISTICS RENAME.
  */

@@ -267,6 +267,11 @@ IsCitusDependentObject(ObjectAddress objectAddress, HTAB *dependentObjects)
 bool
 HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 {
+	if (!CitusHasBeenLoaded())
+	{
+		return false;
+	}
+
 	if (node == NULL)
 	{
 		return false;
@@ -467,23 +472,13 @@ HideCitusDependentObjectsFromPgMetaTable(Node *node, void *context)
 
 
 /*
- * HasPgLocksTable returns true if RTEs contain pg_locks table.
+ * IsPgLocksTable returns true if RTE is pg_locks table.
  */
 bool
-HasPgLocksTable(List *rtes)
+IsPgLocksTable(RangeTblEntry *rte)
 {
 	Oid pgLocksId = get_relname_relid("pg_locks", get_namespace_oid("pg_catalog", false));
-
-	RangeTblEntry *rte = NULL;
-	foreach_ptr(rte, rtes)
-	{
-		if (rte->relid == pgLocksId)
-		{
-			return true;
-		}
-	}
-
-	return false;
+	return rte->relid == pgLocksId;
 }
 
 

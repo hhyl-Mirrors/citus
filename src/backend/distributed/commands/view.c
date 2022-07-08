@@ -246,6 +246,46 @@ PreprocessDropViewStmt(Node *node, const char *queryString, ProcessUtilityContex
 
 
 /*
+ * DropViewStmtObjectAddress returns object address for drop view statement.
+ */
+ObjectAddress
+DropViewStmtObjectAddress(Node *stmt, bool missing_ok)
+{
+	DropStmt *dropStmt = castNode(DropStmt, stmt);
+
+	ObjectAddress objectAddress = { RelationRelationId, InvalidOid, 0 };
+
+	List *possiblyQualifiedViewName = NULL;
+	foreach_ptr(possiblyQualifiedViewName, dropStmt->objects)
+	{
+		char *viewName = NULL;
+		char *schemaName = NULL;
+		DeconstructQualifiedName(possiblyQualifiedViewName, &schemaName, &viewName);
+
+		if (schemaName == NULL)
+		{
+			RangeVar *viewRangeVar = makeRangeVarFromNameList(possiblyQualifiedViewName);
+			Oid viewOid = RangeVarGetRelid(viewRangeVar, AccessExclusiveLock,
+										   missing_ok);
+			if (!OidIsValid(viewOid))
+			{
+				/*
+				 * Citus should not throw error for non-existing objects, let Postgres do that.
+				 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+				 */
+				return InvalidObjectAddress;
+			}
+
+			objectAddress.objectId = viewOid;
+			break;
+		}
+	}
+
+	return objectAddress;
+}
+
+
+/*
  * FilterNameListForDistributedViews takes a list of view names and filters against the
  * views that are distributed.
  *

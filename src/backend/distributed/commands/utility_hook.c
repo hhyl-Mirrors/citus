@@ -114,6 +114,7 @@ static bool ShouldCheckUndistributeCitusLocalTables(void);
 static bool ShouldAddNewTableToMetadata(Node *parsetree);
 static bool ServerUsesPostgresFDW(char *serverName);
 static void ErrorIfOptionListHasNoTableName(List *optionList);
+static bool ShouldCheckObjectValidity(Node *node);
 
 
 /*
@@ -522,12 +523,24 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 
 	/* only generate worker DDLJobs if propagation is enabled */
 	const DistributeObjectOps *ops = NULL;
+
+	/* determines if we should run preprocess and postprocess steps for the object */
+	bool objValid = true;
 	if (EnableDDLPropagation)
 	{
 		/* copy planned statement since we might scribble on it or its utilityStmt */
 		pstmt = copyObject(pstmt);
 		parsetree = pstmt->utilityStmt;
 		ops = GetDistributeObjectOps(parsetree);
+
+		if (ShouldCheckObjectValidity(parsetree))
+		{
+			/* We disable qualify, preprocess and postprocess if object is not valid after validating
+			 * the object in address function.
+			 */
+			ObjectAddress objectAddress = ops->address(parsetree, true);
+			objValid = OidIsValid(objectAddress.objectId);
+		}
 
 		/*
 		 * For some statements Citus defines a Qualify function. The goal of this function
@@ -538,12 +551,12 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 		 * deserialize calls for the statement portable to other postgres servers, the
 		 * workers in our case.
 		 */
-		if (ops && ops->qualify)
+		if (ops && ops->qualify && objValid)
 		{
 			ops->qualify(parsetree);
 		}
 
-		if (ops && ops->preprocess)
+		if (ops && ops->preprocess && objValid)
 		{
 			ddlJobs = ops->preprocess(parsetree, queryString, context);
 		}
@@ -692,7 +705,7 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 	 */
 	if (EnableDDLPropagation)
 	{
-		if (ops && ops->postprocess)
+		if (ops && ops->postprocess && objValid)
 		{
 			List *processJobs = ops->postprocess(parsetree, queryString);
 
@@ -827,7 +840,7 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 		 * Since we must have objects on workers before distributing them,
 		 * mark object distributed as the last step.
 		 */
-		if (ops && ops->markDistributed)
+		if (ops && ops->markDistributed && objValid)
 		{
 			ObjectAddress address = GetObjectAddressFromParseTree(parsetree, false);
 			MarkObjectDistributed(&address);
@@ -910,6 +923,43 @@ UndistributeDisconnectedCitusLocalTables(void)
 		};
 		UndistributeTable(&params);
 	}
+}
+
+
+/*
+ * ShouldCheckObjectValidity decides if we validate a distributed object.
+ * Currently, we added all objects which cause postgres vanilla tests to fail
+ * bacause citus logs before postgres in its preprocess, qualify or postprocess steps.
+ */
+static bool
+ShouldCheckObjectValidity(Node *node)
+{
+	if (EnablePropagationWarnings)
+	{
+		return false;
+	}
+
+	return IsA(node, AlterDomainStmt) ||
+		   IsA(node, ReindexStmt) ||
+		   IsA(node, AlterEnumStmt) ||
+		   (IsA(node, AlterObjectSchemaStmt) &&
+			((AlterObjectSchemaStmt *) node)->objectType == OBJECT_TYPE) ||
+		   (IsA(node, AlterOwnerStmt) && ((AlterOwnerStmt *) node)->objectType ==
+			OBJECT_TYPE) ||
+		   (IsA(node, AlterTableStmt) && AlterTableStmtObjType_compat(
+				((AlterTableStmt *) node)) == OBJECT_TYPE) ||
+		   (IsA(node, DropStmt) && ((DropStmt *) node)->removeType == OBJECT_SEQUENCE) ||
+		   (IsA(node, DropStmt) && ((DropStmt *) node)->removeType ==
+			OBJECT_STATISTIC_EXT) ||
+		   (IsA(node, DropStmt) && ((DropStmt *) node)->removeType == OBJECT_VIEW) ||
+		   (IsA(node, DropStmt) && ((DropStmt *) node)->removeType ==
+			OBJECT_TSDICTIONARY) ||
+		   (IsA(node, DropStmt) && ((DropStmt *) node)->removeType ==
+			OBJECT_TSCONFIGURATION) ||
+		   (IsA(node, RenameStmt) && ((RenameStmt *) node)->renameType == OBJECT_TYPE) ||
+		   (IsA(node, RenameStmt) && ((RenameStmt *) node)->renameType ==
+			OBJECT_ATTRIBUTE &&
+			((RenameStmt *) node)->relationType == OBJECT_TYPE);
 }
 
 

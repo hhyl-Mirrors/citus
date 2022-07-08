@@ -11,7 +11,6 @@
 
 #include "distributed/pg_version_constants.h"
 
-#include "common/hashfn.h"
 #include "funcapi.h"
 
 #include <float.h>
@@ -130,6 +129,7 @@ static RTEListProperties * GetRTEListProperties(List *rangeTableList);
 static List * TranslatedVars(PlannerInfo *root, int relationIndex);
 static void WarnIfListHasForeignDistributedTable(List *rangeTableList);
 
+
 /* Distributed planner hook */
 PlannedStmt *
 distributed_planner(Query *parse,
@@ -141,14 +141,17 @@ distributed_planner(Query *parse,
 {
 	bool needsDistributedPlanning = false;
 	bool fastPathRouterQuery = false;
-	bool hasPgLocksTable = false;
 	Node *distributionKeyValue = NULL;
 
 	List *rangeTableList = ExtractRangeTableEntryList(parse);
 
-	if (HideCitusDependentObjects && CitusHasBeenLoaded())
+	if (HideCitusDependentObjects)
 	{
-		hasPgLocksTable = HasPgLocksTable(rangeTableList);
+		/*
+		 * If GUC is set, we prevent queries, which contain pg meta relations, from
+		 * showing any citus dependent object. The flag is expected to be set only before
+		 * postgres vanilla tests.
+		 */
 		HideCitusDependentObjectsFromPgMetaTable((Node *) parse, NULL);
 	}
 
@@ -159,7 +162,7 @@ distributed_planner(Query *parse,
 
 		needsDistributedPlanning = true;
 	}
-	else if (!hasPgLocksTable && CitusHasBeenLoaded())
+	else if (CitusHasBeenLoaded())
 	{
 		bool maybeHasForeignDistributedTable = false;
 		needsDistributedPlanning =
@@ -275,7 +278,7 @@ distributed_planner(Query *parse,
 	 * standard_planner performs some modifications on parse tree. In such cases
 	 * we will simply error out.
 	 */
-	if (!hasPgLocksTable && !needsDistributedPlanning && NeedsDistributedPlanning(parse))
+	if (!needsDistributedPlanning && NeedsDistributedPlanning(parse))
 	{
 		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						errmsg("cannot perform distributed planning on this "
@@ -353,6 +356,16 @@ ListContainsDistributedTableRTE(List *rangeTableList,
 
 		if (rangeTableEntry->rtekind != RTE_RELATION)
 		{
+			continue;
+		}
+
+		if (IsPgLocksTable(rangeTableEntry))
+		{
+			/*
+			 * Postgres tidscan test fails if we do not filter pg_locks table because
+			 * test results, which show taken locks in serializable isolation mode,
+			 * fails by showing extra lock taken by IsCitusTable below.
+			 */
 			continue;
 		}
 
