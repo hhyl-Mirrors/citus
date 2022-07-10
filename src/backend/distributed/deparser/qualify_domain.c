@@ -23,7 +23,6 @@
 
 #include "distributed/deparser.h"
 #include "distributed/listutils.h"
-#include "distributed/log_utils.h"
 
 
 static void QualifyTypeName(TypeName *typeName, bool missing_ok);
@@ -81,11 +80,6 @@ QualifyDropDomainStmt(Node *node)
 void
 QualifyAlterDomainStmt(Node *node)
 {
-	if (!EnablePropagationWarnings)
-	{
-		return;
-	}
-
 	AlterDomainStmt *stmt = castNode(AlterDomainStmt, node);
 
 	if (list_length(stmt->typeName) == 1)

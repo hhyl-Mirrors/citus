@@ -38,6 +38,8 @@
 
 static CollateClause * MakeCollateClauseFromOid(Oid collationOid);
 static ObjectAddress GetDomainAddressByName(TypeName *domainName, bool missing_ok);
+static bool IsDropValidConstraint(Oid domainOid, char *constraintName);
+static bool IsDropConstraintStmt(AlterDomainStmt *alterDomainStmt);
 
 /*
  * GetDomainAddressByName returns the ObjectAddress of the domain identified by
@@ -244,6 +246,39 @@ CreateDomainStmtObjectAddress(Node *node, bool missing_ok)
 
 
 /*
+ * IsDropValidConstraint returns false if stmt is a alter domain drop constraint,
+ * and the constraint is not found. We should not check the constraint in postprocess callback,
+ * because we cannot differentiate whether the constraint is really dropped or is missing.
+ */
+static bool
+IsDropValidConstraint(Oid domainOid, char *constraintName)
+{
+	Assert(OidIsValid(domainOid));
+
+	if (DistObjectCurrentState == DISTOBJECTSTATE_PREPROCESS)
+	{
+		Oid constraintOid = get_domain_constraint_oid(domainOid, constraintName, true);
+		if (!OidIsValid(constraintOid))
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+
+/*
+ * IsDropConstraintStmt returns true if alter domain statement is about dropping constraint.
+ */
+bool
+IsDropConstraintStmt(AlterDomainStmt *alterDomainStmt)
+{
+	return alterDomainStmt->subtype == 'X';
+}
+
+
+/*
  * AlterDomainStmtObjectAddress returns the ObjectAddress of the domain being altered.
  * When missing_ok is false this function will raise an error when the domain is not
  * found.
@@ -254,7 +289,22 @@ AlterDomainStmtObjectAddress(Node *node, bool missing_ok)
 	AlterDomainStmt *stmt = castNode(AlterDomainStmt, node);
 
 	TypeName *domainName = makeTypeNameFromNameList(stmt->typeName);
-	return GetDomainAddressByName(domainName, missing_ok);
+	ObjectAddress domainObjectAddress = GetDomainAddressByName(domainName, missing_ok);
+
+	Oid domainOid = domainObjectAddress.objectId;
+	if (OidIsValid(domainOid) && IsDropConstraintStmt(stmt))
+	{
+		if (!IsDropValidConstraint(domainOid, stmt->name))
+		{
+			/*
+			 * Citus should not throw error for non-existing objects, let Postgres do that.
+			 * Otherwise, Citus might throw a different error than Postgres, which we don't want.
+			 */
+			return InvalidObjectAddress;
+		}
+	}
+
+	return domainObjectAddress;
 }
 
 

@@ -84,6 +84,7 @@
 bool EnableDDLPropagation = true; /* ddl propagation is enabled */
 int CreateObjectPropagationMode = CREATE_OBJECT_PROPAGATION_IMMEDIATE;
 PropSetCmdBehavior PropagateSetCommands = PROPSETCMD_NONE; /* SET prop off */
+DistObjectState DistObjectCurrentState = DISTOBJECTSTATE_INVALID;
 static bool shouldInvalidateForeignKeyGraph = false;
 static int activeAlterTables = 0;
 static int activeDropSchemaOrDBs = 0;
@@ -284,6 +285,8 @@ multi_ProcessUtility(PlannedStmt *pstmt,
 
 		return;
 	}
+
+	DistObjectCurrentState = DISTOBJECTSTATE_PREPROCESS;
 
 	UtilityHookLevel++;
 
@@ -557,6 +560,8 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 			ops->qualify(parsetree);
 		}
 
+		DistObjectCurrentState = DISTOBJECTSTATE_PREPROCESS;
+
 		if (ops && ops->preprocess && isObjectValid)
 		{
 			ddlJobs = ops->preprocess(parsetree, queryString, context);
@@ -706,6 +711,8 @@ ProcessUtilityInternal(PlannedStmt *pstmt,
 	 */
 	if (EnableDDLPropagation)
 	{
+		DistObjectCurrentState = DISTOBJECTSTATE_POSTPROCESS;
+
 		if (ops && ops->postprocess && isObjectValid)
 		{
 			List *processJobs = ops->postprocess(parsetree, queryString);

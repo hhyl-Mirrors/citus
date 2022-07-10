@@ -50,6 +50,20 @@ extern bool InDelegatedProcedureCall;
 
 
 /*
+ * At the start of multi_utility hook we are in the state DISTOBJECTSTATE_PREPROCESS.
+ * After preproces callback execution, we are in the state DISTOBJECTSTATE_POSTPROCESS.
+ * After postprocess callback execution, we are back in the state DISTOBJECTSTATE_PREPROCESS.
+ */
+typedef enum
+{
+	DISTOBJECTSTATE_INVALID = 0,
+	DISTOBJECTSTATE_PREPROCESS,
+	DISTOBJECTSTATE_POSTPROCESS,
+} DistObjectState;
+extern DistObjectState DistObjectCurrentState;
+
+
+/*
  * A DDLJob encapsulates the remote tasks and commands needed to process all or
  * part of a distributed DDL command. It hold the target object's address,
  * the original DDL command string (for MX DDL propagation), and a task list of
